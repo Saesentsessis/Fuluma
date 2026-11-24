@@ -1,0 +1,4 @@
+[Shader Stripping] Fuluma: kept 64 of 3456 variants of Hidden/Fuluma/Analytical/SpotLight (Custom)
+[Shader Stripping] Fuluma: kept 16 of 16 variants of Hidden/Fuluma/LightBuffer (Custom)
+[Shader Stripping] Fuluma: report written to Logs/ShaderStripping/com.saesentsessis.fuluma.json
+Build completed with a result of 'Succeeded' in 412 seconds (412310 ms)

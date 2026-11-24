@@ -1,0 +1,12 @@
+{
+  "name": "fuluma",
+  "description": "Skills for setting up, debugging and tuning Fuluma fake lights and its URP render feature in a Unity project.",
+  "author": {
+    "name": "Saesentsessis",
+    "url": "https://github.com/Saesentsessis"
+  },
+  "homepage": "https://github.com/Saesentsessis/Fuluma",
+  "repository": "https://github.com/Saesentsessis/Fuluma",
+  "license": "MIT",
+  "keywords": ["unity", "urp", "volumetric", "lights", "fuluma"]
+}

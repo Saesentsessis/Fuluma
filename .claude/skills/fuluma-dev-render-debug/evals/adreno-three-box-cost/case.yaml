@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: adreno-three-box-cost
+expected_outcome: |
+  Points to the general clip box variant (_FULUMA_CLIP_BOXES, three or four boxes) as the code path, and to its vertex-side packed box terms (3 flat + 3 interpolated float4 varyings plus per-pixel interval merging over up to 5 pieces) as the prime suspect on Adreno (varying or register pressure), with the measured numbers from docs/dev/PixelShaderIdeas.md. Proposes a concrete confirmation plan (compare the one-box/pair/exclude variants on the Poco, inspect the variant with an offline compiler or the shader dump, vary the piece limit or try the per-pixel variant), and changes nothing without asking.

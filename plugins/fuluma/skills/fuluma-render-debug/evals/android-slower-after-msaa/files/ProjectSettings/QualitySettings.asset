@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!47 &1
+QualitySettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 5
+  m_CurrentQuality: 0
+  m_QualitySettings:
+  - serializedVersion: 4
+    name: Mobile
+    pixelLightCount: 2
+    antiAliasing: 0
+    customRenderPipeline: {fileID: 11400000, guid: 2d3e4f5a6b7c4d8e9f0a1b2c3d4e5f6a, type: 2}
+  m_PerPlatformDefaultQuality:
+    Android: 0

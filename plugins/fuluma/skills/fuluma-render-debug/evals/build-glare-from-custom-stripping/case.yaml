@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: build-glare-from-custom-stripping
+expected_outcome: |
+  Finds that Fuluma's shader variant stripping is in Custom mode (ProjectSettings/FulumaSettings.asset, mode: 1) and denies the lamp glare group's none value '_' (Lamp Glare None, which the feature uses: lampGlare 0), so the build only has the Point lamp variants and Unity draws with the closest kept variant: the point-lamp hotspot. The Editor has every variant, so it looks right. Proposes ticking Lamp Glare None again (or Automatic mode) and rebuilding, cites the settings and the build log line, and asks before changing.
+context:
+  scaffold_script: place-files.sh

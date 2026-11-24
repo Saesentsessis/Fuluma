@@ -1,0 +1,66 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2026-11-24
+
+### Added
+
+- Initial preview release of Fuluma: analytical (fake) volumetric spot lights for URP, mobile first. Point lights, GPU
+  culling and OpenGL ES 3.x support are planned for later versions.
+- **Fake volumetric spot lights**, drawn by `FulumaRenderFeature` in every URP rendering path (Forward, Forward+,
+  Deferred, Deferred+), RenderGraph only.
+  - Analytical in-scattering: inverse-square falloff with a smooth range cut-off, an inner/outer cone penumbra, and
+    the glow integrated along the view ray inside the cone and up to the scene depth (per-segment Gauss-Legendre
+    quadrature).
+  - Static lights (placed from code) and dynamic lights (following a `Transform` every frame, synced and copied
+    by jobs off the main thread).
+- **Components**:
+  - `FakeSpotLight` — a standalone fake spot light.
+  - `LinkedFakeLight` — mirrors a Unity spot `Light` (color, color temperature, intensity, range, angles), every
+    frame or in the Editor only.
+  - `FakeLightClipBox` — an oriented box that limits where lights glow.
+  - GameObject > Light > Volumetric menu items for all three.
+- **`LightStore`** — a `ScriptableObject` holding lights and clip boxes in native memory, with a public API for
+  adding, moving, changing and removing them from code (including a batched, Burst-jobified `SetSpotLightPlacements`).
+  `LightStore.Default` is used when no store is assigned.
+- **Clip boxes** — up to four per light, each Keep (the light exists only inside) or Subtract (removed inside),
+  exact per pixel. Dedicated shader variants for the common cases (one box, keep + subtract, two keeps, two
+  subtracts) and a general one for three or four boxes.
+- **CPU culling** per camera (Burst, multithreaded): frustum culling with an exact cone test, proxy mesh LODs by
+  screen size, and a split between lights the camera is inside of and the rest (which keep early-Z).
+- **Downsampled light buffer**: lights shaded at a fraction of the camera resolution (0.01–1) and upscaled
+  bilinearly or depth-aware; optionally only large lights; optionally shaded before the opaques from URP's depth
+  prepass, which keeps URP's render passes merged on tile-based GPUs.
+- **Fidelity features**, each trading quality against cost: scene depth, clip boxes, near-plane fade, wide cone
+  precision (exact glow near the axis of cones wider than about 160°) and proxy LODs.
+- **Render feature settings**: pass event (default After Rendering Skybox, so the sky doesn't cover glow in front of
+  it), override store, camera layers, global light intensity, maximum lights per camera, initial GPU buffer capacities
+  with memory readouts, and the number of buffers per-frame data rotates through.
+- **Scattering settings** on the render feature, each option its own shader variant (the defaults keep the isotropic,
+  range-scaled model): the phase function (Isotropic, or Henyey-Greenstein with a global anisotropy), the distance
+  falloff (Range Scaled, or URP's own light attenuation, where intensity means what a Unity Light's does) and the lamp
+  glare (None, or a point lamp whose glow grows without bound toward it).
+- **Shader variant stripping** on Project Settings > Fuluma (`ProjectSettings/FulumaSettings.asset`): Automatic keeps
+  the variants the build's Fuluma render features use (plus listed shader variant collections, and optionally inactive
+  features), Custom keeps the ticked values per keyword group; excluded combinations apply in both modes. The page
+  previews how many variants a build keeps, and each build logs a summary per shader and writes a JSON report to
+  `Logs/ShaderStripping/`. The stripping itself comes from the ShaderWorks package
+  (`com.saesentsessis.unity-shaderworks`).
+- **Editor tooling**: Scene view gizmos and handles for lights (range, inner and outer angles) and clip boxes, a
+  combined cone angle slider, an inspector status for every light and box (registered where, and which renderers
+  draw its store), and warnings for clip box slots that have no effect.
+- User manual in `Documentation~`: a page per component and asset, and a technical deep dive.
+- Profiler markers and samplers for the upload, culling and draw passes.
+- EditMode test suite, including comparisons of the rendered glow against a brute-force integral.
+- Requires Unity 6000.3 or newer; dependencies on `com.unity.render-pipelines.universal` 17.3.0,
+  `com.unity.burst` 1.8.25, `com.unity.collections` 2.6.2, `com.unity.mathematics` 1.3.3,
+  `com.saesentsessis.unity-collections-specialized` 0.3.0, `com.saesentsessis.unity-meshgen` 0.2.0 and
+  `com.saesentsessis.unity-shaderworks` 0.1.1. The GPU must
+  support compute shaders and structured buffers in vertex shaders: verified on Direct3D 11 and 12 and on Vulkan
+  (Mali-G52, Mali-G77); OpenGL ES 3.x isn't supported yet (Mali's drivers have no vertex-stage structured buffers).
+
+[0.1.0]: https://github.com/Saesentsessis/Fuluma/releases/tag/0.1.0

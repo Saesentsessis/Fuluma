@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &1
+MonoBehaviour:
+  m_ObjectHideFlags: 53
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c3ed50bc351b584b8022de449450642, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Saesentsessis.Fuluma.Editor::Saesentsessis.Fuluma.Editor.Build.FulumaProjectSettings
+  stripping:
+    version: 1
+    mode: 0
+    countInactiveSources: 0
+    collections: []
+    logSummary: 1
+    writeReport: 1
+    denied:
+    - schemaId: spotLight
+      groupId: clipClass
+      valueIds: []
+    - schemaId: spotLight
+      groupId: scatteringPhase
+      valueIds: []
+    - schemaId: spotLight
+      groupId: lampGlare
+      valueIds: []
+    - schemaId: spotLight
+      groupId: depthSource
+      valueIds: []
+    - schemaId: spotLight
+      groupId: nearPlaneFade
+      valueIds: []
+    - schemaId: spotLight
+      groupId: wideConePrecision
+      valueIds: []
+    - schemaId: spotLight
+      groupId: distanceFalloff
+      valueIds: []
+    exclusions: []

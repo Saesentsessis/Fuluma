@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 15b5c5d6e4b16d3449af8a5d1c6eb17d, type: 3}
+  m_Name: URP
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset
+  m_RendererDataList:
+  - {fileID: 11400000, guid: 6b7c8d9e0f1a4b2c3d4e5f6a7b8c9d0e, type: 2}
+  m_DefaultRendererIndex: 0
+  m_RequireDepthTexture: 0
+  m_RequireOpaqueTexture: 0
+  m_SupportsHDR: 1
+  m_MSAA: 1
+  m_RenderScale: 1

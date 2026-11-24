@@ -7,15 +7,15 @@
     Replaces placeholders in file content, filenames, and directory names.
 
     Placeholders:
-    - YOUR_PACKAGE_ID                  UPM / reverse-domain identity (as provided)
-    - YOUR_PACKAGE_ID_LOWERCASE        Lowercase form used in package.json and manifests
-    - YOUR_ASSEMBLY_NAME               C# namespaces, asmdef names, and assembly filenames
-    - YOUR_PACKAGE_NAME                Display / description name (not used for code identity)
-    - YOUR_PACKAGE_NAME_INSTALLER
-    - YOUR_PACKAGE_NAME_INSTALLER_FILE
-    - YOUR_GITHUB_USERNAME_REPOSITORY
+    - com.saesentsessis.fuluma                  UPM / reverse-domain identity (as provided)
+    - com.saesentsessis.fuluma        Lowercase form used in package.json and manifests
+    - Saesentsessis.Fuluma               C# namespaces, asmdef names, and assembly filenames
+    - Fuluma                Display / description name (not used for code identity)
+    - Fuluma Installer
+    - Fuluma-Installer
+    - Saesentsessis/Fuluma
 
-    Also renames the host Unity project folder `Unity-Package` to the GitHub
+    Also renames the host Unity project folder `Fuluma` to the GitHub
     repository name (the segment after `/` in -GitHubRepository), and rewrites
     path references accordingly. The string `Unity-Package-Template` is left alone
     so template attribution URLs stay intact.
@@ -43,7 +43,7 @@
 
 .PARAMETER GitHubRepository
     GitHub "Username/Repository-Name" (e.g. "MyGitHubUsername/My-Repository-Name").
-    The repository name becomes the Unity project folder (replacing `Unity-Package`).
+    The repository name becomes the Unity project folder (replacing `Fuluma`).
 
 .EXAMPLE
     .\init.ps1 -PackageId "com.mycompany.coolpackage" -AssemblyName "CoolPackage" -PackageName "Cool Package" -GitHubRepository "myusername/cool-package"
@@ -219,7 +219,7 @@ function Invoke-UnityProjectPathReplace {
 
     # Protect $ in the replacement so regex does not treat it as a group reference.
     $SafeReplacement = $UnityProjectName.Replace('$', '$$')
-    return [regex]::Replace($Text, 'Unity-Package(?!-Template)', $SafeReplacement)
+    return [regex]::Replace($Text, 'Fuluma(?!-Template)', $SafeReplacement)
 }
 
 # --- Prompt / normalize inputs ------------------------------------------------
@@ -255,7 +255,7 @@ if (-not [string]::IsNullOrWhiteSpace($InstallerExtraPath)) {
     $InstallerExtraPath = ($InstallerExtraPath.Trim() -replace '\\', '/').TrimStart('/').TrimEnd('/')
 }
 
-$UnityProjectFolderSource = "Unity-Package"
+$UnityProjectFolderSource = "Fuluma"
 $UnityProjectName = Get-UnityProjectNameFromGitHubRepository -Repository $GitHubRepository
 
 $PackageIdLowercase = $PackageId.ToLowerInvariant()
@@ -272,26 +272,26 @@ else {
 # Content replacements: installer path may include InstallerExtraPath.
 # Rename map: folder name stays the base installer name (path created separately).
 $Replacements = [ordered]@{
-    "YOUR_PACKAGE_ID_LOWERCASE"        = $PackageIdLowercase
-    "YOUR_PACKAGE_NAME_INSTALLER_FILE" = $PackageNameInstallerFile
-    "YOUR_PACKAGE_NAME_INSTALLER"      = $PackageNameInstaller
-    "YOUR_GITHUB_USERNAME_REPOSITORY"  = $GitHubRepository
-    "YOUR_ASSEMBLY_NAME"               = $AssemblyName
-    "YOUR_PACKAGE_NAME"                = $PackageName
-    "YOUR_PACKAGE_ID"                  = $PackageId
+    "com.saesentsessis.fuluma"        = $PackageIdLowercase
+    "Fuluma-Installer" = $PackageNameInstallerFile
+    "Fuluma Installer"      = $PackageNameInstaller
+    "Saesentsessis/Fuluma"  = $GitHubRepository
+    "Saesentsessis.Fuluma"               = $AssemblyName
+    "Fuluma"                = $PackageName
+    "com.saesentsessis.fuluma"                  = $PackageId
 }
 
 $ReplacementsForRenaming = [ordered]@{
-    "YOUR_PACKAGE_ID_LOWERCASE"        = $PackageIdLowercase
-    "YOUR_PACKAGE_NAME_INSTALLER_FILE" = $PackageNameInstallerFile
-    "YOUR_PACKAGE_NAME_INSTALLER"      = $PackageNameInstallerBase
-    "YOUR_GITHUB_USERNAME_REPOSITORY"  = $GitHubRepository
-    "YOUR_ASSEMBLY_NAME"               = $AssemblyName
-    "YOUR_PACKAGE_NAME"                = $PackageName
-    "YOUR_PACKAGE_ID"                  = $PackageId
+    "com.saesentsessis.fuluma"        = $PackageIdLowercase
+    "Fuluma-Installer" = $PackageNameInstallerFile
+    "Fuluma Installer"      = $PackageNameInstallerBase
+    "Saesentsessis/Fuluma"  = $GitHubRepository
+    "Saesentsessis.Fuluma"               = $AssemblyName
+    "Fuluma"                = $PackageName
+    "com.saesentsessis.fuluma"                  = $PackageId
 }
 
-# Longest-first to avoid partial overlaps (e.g. YOUR_PACKAGE_ID inside YOUR_PACKAGE_ID_LOWERCASE)
+# Longest-first to avoid partial overlaps (e.g. com.saesentsessis.fuluma inside com.saesentsessis.fuluma)
 $SortedKeys = @($Replacements.Keys | Sort-Object { $_.Length } -Descending)
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -363,7 +363,7 @@ foreach ($File in (Get-TargetFiles -RepoRoot $RepoRoot -TargetPaths $TargetPaths
 if (-not [string]::IsNullOrWhiteSpace($InstallerExtraPath)) {
     Write-Host "Creating extra path and moving installer folder..." -ForegroundColor Yellow
     $InstallerAssetsDir = Join-Path $RepoRoot "Installer/Assets"
-    $SourceFolder = Join-Path $InstallerAssetsDir "YOUR_PACKAGE_NAME_INSTALLER"
+    $SourceFolder = Join-Path $InstallerAssetsDir "Fuluma Installer"
     $ExtraPathDir = Join-Path $InstallerAssetsDir $InstallerExtraPath
 
     if (-not (Test-Path $ExtraPathDir)) {
@@ -372,7 +372,7 @@ if (-not [string]::IsNullOrWhiteSpace($InstallerExtraPath)) {
     }
 
     if (Test-Path $SourceFolder) {
-        $DestFolder = Join-Path $ExtraPathDir "YOUR_PACKAGE_NAME_INSTALLER"
+        $DestFolder = Join-Path $ExtraPathDir "Fuluma Installer"
         Move-Item -Path $SourceFolder -Destination $DestFolder -Force
         Write-Host "  Moved installer to: $InstallerExtraPath/" -ForegroundColor Gray
     }

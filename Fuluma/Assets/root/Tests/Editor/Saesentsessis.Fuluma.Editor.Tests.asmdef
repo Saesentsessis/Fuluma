@@ -1,0 +1,33 @@
+{
+    "name": "Saesentsessis.Fuluma.Editor.Tests",
+    "rootNamespace": "",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Saesentsessis.Fuluma.Runtime",
+        "Saesentsessis.Fuluma.Editor",
+        "Saesentsessis.Fuluma.Tests",
+        "Unity.Collections",
+        "Unity.Collections.Specialized",
+        "Unity.Mathematics",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Saesentsessis.Shaders.Stripping.Editor",
+        "Unity.Burst"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

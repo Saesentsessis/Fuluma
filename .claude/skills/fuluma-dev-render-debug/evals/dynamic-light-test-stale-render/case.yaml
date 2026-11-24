@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: dynamic-light-test-stale-render
+expected_outcome: |
+  Explains that the GPU mirror writes dynamic transforms (ring buffers) at most once per Time.frameCount, and EditMode renders don't advance the frame count, so the second Camera.Render reuses the first frame's data. Fix: call SpotLightGpuMirror.ForgetFrameGuardsForTests() before each render, or render through RenderScene's own render helper, which does it. Asks before editing the test.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: android-renderer-without-feature
+expected_outcome: |
+  Finds that Android uses quality level "Mobile" (m_PerPlatformDefaultQuality Android: 0), whose URP asset URP-Mobile renders with URP-Mobile-Renderer, which has no Fuluma render feature (only SSAO); the Editor runs "PC" (m_CurrentQuality 1), whose renderer has the feature. Proposes adding the Fuluma Render Feature to URP-Mobile-Renderer, notes the GPU/Vulkan is not the problem (no Fuluma error in logcat), and asks before changing.
+context:
+  scaffold_script: place-files.sh

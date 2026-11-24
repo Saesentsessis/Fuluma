@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "com.unity.test-framework": "1.6.0",
+    "PACKAGE_ID": "PACKAGE_VERSION"
+  }
+}

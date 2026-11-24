@@ -1,0 +1,11 @@
+diff --git a/Fuluma/Assets/root/Shaders/Analytical/SpotLight/FulumaSpotLight.shader b/Fuluma/Assets/root/Shaders/Analytical/SpotLight/FulumaSpotLight.shader
+@@ -58,6 +58,7 @@
+             #pragma multi_compile_local _ _FULUMA_PHASE_HG
+             #pragma multi_compile_local _ _FULUMA_FALLOFF_UNITY
+             #pragma multi_compile_local _ _FULUMA_POINT_LAMP
++            #pragma multi_compile_local _ _FULUMA_SOFT_EDGES
+@@ -106,6 +107,7 @@
+             #pragma multi_compile_local _ _FULUMA_PHASE_HG
+             #pragma multi_compile_local _ _FULUMA_FALLOFF_UNITY
+             #pragma multi_compile_local _ _FULUMA_POINT_LAMP
++            #pragma multi_compile_local _ _FULUMA_SOFT_EDGES

@@ -1,2 +1,12 @@
-# Claude
-.claude
+# Claude: local notes stay private; project skills are shared (Claude Code only discovers them in .claude/skills/)
+/.claude/*
+!/.claude/skills/
+
+# Unity Library folder at the repository root (not a Unity project: a Unity started from here leaves its Burst cache)
+/[Ll]ibrary/
+
+# Burst compiler caches anywhere (each Unity project's .gitignore also ignores their .meta files)
+**/[Ll]ibrary/[Bb]urst[Cc]ache/
+
+# Example environments imported from other projects (local only; too large for the repo)
+/Fuluma/Assets/Environments/

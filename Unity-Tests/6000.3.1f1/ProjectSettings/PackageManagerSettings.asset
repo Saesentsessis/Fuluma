@@ -34,9 +34,9 @@ MonoBehaviour:
     m_Name: package.openupm.com
     m_Url: https://package.openupm.com
     m_Scopes:
-    - com.ivanmurzak
-    - extensions.unity
-    - org.nuget
+    - com.saesentsessis.unity-collections-specialized
+    - com.saesentsessis.unity-meshgen
+    - com.saesentsessis.unity-shaderworks
     m_IsDefault: 0
     m_Capabilities: 0
     m_ConfigSource: 4

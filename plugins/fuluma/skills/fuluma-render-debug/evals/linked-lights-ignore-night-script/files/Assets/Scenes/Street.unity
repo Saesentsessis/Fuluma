@@ -1,0 +1,150 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &900
+GameObject:
+  m_Name: Main Camera
+  m_TagString: MainCamera
+  m_IsActive: 1
+--- !u!20 &901
+Camera:
+  m_GameObject: {fileID: 900}
+  m_Enabled: 1
+  m_ClearFlags: 1
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &902
+MonoBehaviour:
+  m_GameObject: {fileID: 900}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderType: 0
+  m_RendererIndex: -1
+  m_RenderPostProcessing: 1
+--- !u!1 &1100
+GameObject:
+  m_Name: Street Lamp 1
+  m_IsActive: 1
+--- !u!108 &1101
+Light:
+  m_GameObject: {fileID: 1100}
+  m_Enabled: 0
+  m_Type: 0
+  m_Color: {r: 1, g: 0.85, b: 0.6, a: 1}
+  m_Intensity: 12
+  m_Range: 9
+  m_SpotAngle: 70
+  m_InnerSpotAngle: 40
+--- !u!114 &1102
+MonoBehaviour:
+  m_GameObject: {fileID: 1100}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: 159c5fe021417c741a8246f76e850a3c, type: 3}
+  m_EditorClassIdentifier: Saesentsessis.Fuluma.Runtime::Saesentsessis.Fuluma.Rendering.Components.LinkedFakeLight
+  overrideStore: {fileID: 0}
+  syncTransform: 0
+  clipBoxes:
+    Slot0:
+      Box: {fileID: 0}
+      Role: 0
+    Slot1:
+      Box: {fileID: 0}
+      Role: 0
+    Slot2:
+      Box: {fileID: 0}
+      Role: 0
+    Slot3:
+      Box: {fileID: 0}
+      Role: 0
+  syncMode: 1
+  intensityMultiplier: 0.05
+--- !u!4 &1103
+Transform:
+  m_GameObject: {fileID: 1100}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 5, z: 0}
+--- !u!1 &1200
+GameObject:
+  m_Name: Street Lamp 2
+  m_IsActive: 1
+--- !u!108 &1201
+Light:
+  m_GameObject: {fileID: 1200}
+  m_Enabled: 0
+  m_Type: 0
+  m_Color: {r: 1, g: 0.85, b: 0.6, a: 1}
+  m_Intensity: 12
+  m_Range: 9
+  m_SpotAngle: 70
+  m_InnerSpotAngle: 40
+--- !u!114 &1202
+MonoBehaviour:
+  m_GameObject: {fileID: 1200}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: 159c5fe021417c741a8246f76e850a3c, type: 3}
+  m_EditorClassIdentifier: Saesentsessis.Fuluma.Runtime::Saesentsessis.Fuluma.Rendering.Components.LinkedFakeLight
+  overrideStore: {fileID: 0}
+  syncTransform: 0
+  clipBoxes:
+    Slot0:
+      Box: {fileID: 0}
+      Role: 0
+    Slot1:
+      Box: {fileID: 0}
+      Role: 0
+    Slot2:
+      Box: {fileID: 0}
+      Role: 0
+    Slot3:
+      Box: {fileID: 0}
+      Role: 0
+  syncMode: 1
+  intensityMultiplier: 0.05
+--- !u!4 &1203
+Transform:
+  m_GameObject: {fileID: 1200}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 8, y: 5, z: 0}
+--- !u!1 &1300
+GameObject:
+  m_Name: Street Lamp 3
+  m_IsActive: 1
+--- !u!108 &1301
+Light:
+  m_GameObject: {fileID: 1300}
+  m_Enabled: 0
+  m_Type: 0
+  m_Color: {r: 1, g: 0.85, b: 0.6, a: 1}
+  m_Intensity: 12
+  m_Range: 9
+  m_SpotAngle: 70
+  m_InnerSpotAngle: 40
+--- !u!114 &1302
+MonoBehaviour:
+  m_GameObject: {fileID: 1300}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: 159c5fe021417c741a8246f76e850a3c, type: 3}
+  m_EditorClassIdentifier: Saesentsessis.Fuluma.Runtime::Saesentsessis.Fuluma.Rendering.Components.LinkedFakeLight
+  overrideStore: {fileID: 0}
+  syncTransform: 0
+  clipBoxes:
+    Slot0:
+      Box: {fileID: 0}
+      Role: 0
+    Slot1:
+      Box: {fileID: 0}
+      Role: 0
+    Slot2:
+      Box: {fileID: 0}
+      Role: 0
+    Slot3:
+      Box: {fileID: 0}
+      Role: 0
+  syncMode: 1
+  intensityMultiplier: 0.05
+--- !u!4 &1303
+Transform:
+  m_GameObject: {fileID: 1300}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 16, y: 5, z: 0}

@@ -5,9 +5,7 @@
 # Launches Unity Editor for each project by reading the required version
 # from ProjectSettings/ProjectVersion.txt:
 #   - Installer
-#   - Unity-Package
-#   - Unity-Tests/2022.3.62f3
-#   - Unity-Tests/2023.2.22f1
+#   - Fuluma
 #   - Unity-Tests/6000.3.1f1
 #
 # Usage:
@@ -80,9 +78,7 @@ fi
 # Define projects to open
 PROJECTS=(
     "Installer"
-    "Unity-Package"
-    "Unity-Tests/2022.3.62f3"
-    "Unity-Tests/2023.2.22f1"
+    "Fuluma"
     "Unity-Tests/6000.3.1f1"
 )
 

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: lights-in-unrendered-store
+expected_outcome: |
+  Finds that every FakeSpotLight registers in the custom store "Level01 Lights" (its overrideStore) while the only Fuluma render feature (on URP-HighFidelity-Renderer, used by both quality levels) has an empty Override Store and so draws the default store: nothing draws the level's store. Cites the fields as evidence, proposes setting the feature's Override Store to Level01 Lights (or clearing the lights' override stores), says what the change affects, and asks before changing anything.
+context:
+  scaffold_script: place-files.sh
