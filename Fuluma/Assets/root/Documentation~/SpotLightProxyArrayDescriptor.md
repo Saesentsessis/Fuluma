@@ -24,25 +24,25 @@ Assign the asset to the render feature's **Spot Light Descriptor**. Without one,
 three LODs:
 
 | LOD | Band resolutions | Screen size |
-|---|---|---|
-| 0 | 16, 12, 9, 7, 4 | ≥ 0.25 |
-| 1 | 12, 9, 7, 4 | ≥ 0.08 |
-| 2 | 10, 7, 4 | the rest |
+|-----|------------------|-------------|
+| 0   | 16, 12, 9, 7, 4  | ≥ 0.25      |
+| 1   | 12, 9, 7, 4      | ≥ 0.08      |
+| 2   | 10, 7, 4         | the rest    |
 
 ## Properties
 
-| Property | Description | Default         | Range | Runtime change |
-|---|---|-----------------|---|---|
-| LODs | Proxy LODs, finest first, with non-increasing screen sizes. At most 8 are used. | None (built-in) | 1 to 8 | Applies when a feature's pass is next recreated (see Notes) |
-| LODs > Band Resolutions | Vertices per ring, from the rim toward the cap tip. | Per LOD         | ≥ 3 each | As above |
-| LODs > Screen Size | Smallest screen size drawn with this LOD; smaller lights use the next one. | Per LOD         | ≥ 0 | As above |
+| Property                | Description                                                                     | Default         | Range    | Runtime change                                              |
+|-------------------------|---------------------------------------------------------------------------------|-----------------|----------|-------------------------------------------------------------|
+| LODs                    | Proxy LODs, finest first, with non-increasing screen sizes. At most 8 are used. | None (built-in) | 1 to 8   | Applies when a feature's pass is next recreated (see Notes) |
+| LODs > Band Resolutions | Vertices per ring, from the rim toward the cap tip.                             | Per LOD         | ≥ 3 each | As above                                                    |
+| LODs > Screen Size      | Smallest screen size drawn with this LOD; smaller lights use the next one.      | Per LOD         | ≥ 0      | As above                                                    |
 
 ## Scripting
 
-| Member | Description |
-|---|---|
-| `LodCount` | Number of LODs. |
-| `Lods` | The LODs (`SpotLightProxyDescriptor`: `ScreenSize`, `BandResolutions`). |
+| Member     | Description                                                             |
+|------------|-------------------------------------------------------------------------|
+| `LodCount` | Number of LODs.                                                         |
+| `Lods`     | The LODs (`SpotLightProxyDescriptor`: `ScreenSize`, `BandResolutions`). |
 
 Assigning a descriptor from code:
 

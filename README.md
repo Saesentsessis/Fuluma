@@ -42,16 +42,16 @@ usually does. Performance is the package's first priority; measured results are 
   re-read or re-uploaded until they change; only dynamic lights are re-read from their Transforms, by jobs off the
   main thread.
 
-| | Raymarched volumetrics | Mesh-based fake beams | Fuluma |
-|---|---|---|---|
-| Cost per light | Steps × covered pixels | One draw, often instanced | Instanced draws per LOD, one analytic evaluation per pixel |
-| Hundreds to thousands of lights | Rarely affordable | Yes | Yes, with culling and proxy LODs |
-| Glow quality | Physically based; noisy or banded at low step counts | Textured approximation | Exact for its light model, no noise |
-| Camera inside the volume | Yes | Often breaks | Yes |
-| Scene geometry | Stops at depth | Usually a soft depth fade | Stops exactly at depth |
-| Shadows inside the volume | Yes, from shadow maps | No | No (clip boxes limit where light glows) |
-| Look and per-light styling | Depends on the implementation | Usually the richest options | One analytical model with per-feature scattering options; per light: color, intensity, range, angles, clip boxes |
-| Mobile | Expensive | Cheap | Cheap; downsampled light buffer |
+|                                 | Raymarched volumetrics                               | Mesh-based fake beams       | Fuluma                                                                                                           |
+|---------------------------------|------------------------------------------------------|-----------------------------|------------------------------------------------------------------------------------------------------------------|
+| Cost per light                  | Steps × covered pixels                               | One draw, often instanced   | Instanced draws per LOD, one analytic evaluation per pixel                                                       |
+| Hundreds to thousands of lights | Rarely affordable                                    | Yes                         | Yes, with culling and proxy LODs                                                                                 |
+| Glow quality                    | Physically based; noisy or banded at low step counts | Textured approximation      | Exact for its light model, no noise                                                                              |
+| Camera inside the volume        | Yes                                                  | Often breaks                | Yes                                                                                                              |
+| Scene geometry                  | Stops at depth                                       | Usually a soft depth fade   | Stops exactly at depth                                                                                           |
+| Shadows inside the volume       | Yes, from shadow maps                                | No                          | No (clip boxes limit where light glows)                                                                          |
+| Look and per-light styling      | Depends on the implementation                        | Usually the richest options | One analytical model with per-feature scattering options; per light: color, intensity, range, angles, clip boxes |
+| Mobile                          | Expensive                                            | Cheap                       | Cheap; downsampled light buffer                                                                                  |
 
 Fuluma has one analytical light model. Its [Scattering](#scattering) settings (phase function, distance falloff,
 lamp glare) apply to every light a renderer feature draws; each light's look is then shaped by its color, intensity,
@@ -109,24 +109,24 @@ Fuluma is a 0.x preview: following Semantic Versioning, its public API may chang
 
 **Renderer feature**
 
-| Type | Purpose | Reference |
-|---|---|---|
+| Type                  | Purpose                                                                                                       | Reference                                                                                                                           |
+|-----------------------|---------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | `FulumaRenderFeature` | Culls and draws the fake lights of one light store, at full resolution or through a downsampled light buffer. | [Fuluma Render Feature](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/FulumaRenderFeature.md) |
 
 **Components**
 
-| Type | Purpose | Reference |
-|---|---|---|
-| `FakeSpotLight` | A standalone fake spot light along the GameObject's forward axis. | [Fake Spot Light](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/FakeSpotLight.md) |
-| `LinkedFakeLight` | A fake light that follows a Unity spot `Light` on the same GameObject. | [Fake Light (Linked)](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/LinkedFakeLight.md) |
+| Type               | Purpose                                                                   | Reference                                                                                                                      |
+|--------------------|---------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `FakeSpotLight`    | A standalone fake spot light along the GameObject's forward axis.         | [Fake Spot Light](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/FakeSpotLight.md)        |
+| `LinkedFakeLight`  | A fake light that follows a Unity spot `Light` on the same GameObject.    | [Fake Light (Linked)](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/LinkedFakeLight.md)  |
 | `FakeLightClipBox` | An oriented box that limits where lights glow, as a Keep or Subtract box. | [Fake Light Clip Box](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/FakeLightClipBox.md) |
 
 **Assets**
 
-| Type | Purpose | Reference |
-|---|---|---|
-| `LightStore` | Holds lights and clip boxes in native memory; the code API for adding, moving and removing them. | [Light Store](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/LightStore.md) |
-| `SpotLightProxyArrayDescriptor` | The proxy mesh LODs spot lights are drawn with, picked by screen size. | [Spot Light Proxy Array](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/SpotLightProxyArrayDescriptor.md) |
+| Type                            | Purpose                                                                                          | Reference                                                                                                                                      |
+|---------------------------------|--------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| `LightStore`                    | Holds lights and clip boxes in native memory; the code API for adding, moving and removing them. | [Light Store](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/LightStore.md)                               |
+| `SpotLightProxyArrayDescriptor` | The proxy mesh LODs spot lights are drawn with, picked by screen size.                           | [Spot Light Proxy Array](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/SpotLightProxyArrayDescriptor.md) |
 
 ## Quick Start
 
@@ -416,26 +416,26 @@ How it works under the hood is explained in
 
 ## Platform Support
 
-| Platform / feature | Status |
-|---|---|
-| URP Forward, Forward+, Deferred, Deferred+ | Verified |
-| Perspective and orthographic cameras | Verified |
-| MSAA | Verified |
-| Windows, Direct3D 12 (Editor and player) | Verified |
-| Android, Vulkan (Mali-G52, Mali-G77) | Verified |
-| Windows, Direct3D 11 (Editor) | Verified |
-| Android, OpenGL ES 3.x | Not supported (planned) |
-| XR single-pass instanced | Untested |
-| iOS and macOS, Metal | Untested |
-| WebGPU | Untested |
-| Consoles | Untested |
+| Platform / feature                         | Status                  |
+|--------------------------------------------|-------------------------|
+| URP Forward, Forward+, Deferred, Deferred+ | Verified                |
+| Perspective and orthographic cameras       | Verified                |
+| MSAA                                       | Verified                |
+| Windows, Direct3D 12 (Editor and player)   | Verified                |
+| Android, Vulkan (Mali-G52, Mali-G77)       | Verified                |
+| Windows, Direct3D 11 (Editor)              | Verified                |
+| Android, OpenGL ES 3.x                     | Not supported (planned) |
+| XR single-pass instanced                   | Untested                |
+| iOS and macOS, Metal                       | Untested                |
+| WebGPU                                     | Untested                |
+| Consoles                                   | Untested                |
 
 **Verified**: run in the test suite or on a device. **Untested**: no evidence either way. **Not supported**: known
 not to work.
 
 Some OpenGL ES 3.x drivers, Mali's among them, give vertex shaders no structured buffers, which Fuluma needs (see
 [Hardware Requirements](#hardware-requirements)); there the render feature logs an error and draws nothing. A path
-through constant buffers or data-textures is planned.
+through constant buffers is planned.
 
 ## Hardware Requirements
 

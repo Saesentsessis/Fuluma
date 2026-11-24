@@ -27,83 +27,83 @@ upscaled.
 
 ## Properties
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Event | When in URP's frame the lights are drawn (see Overview). | After Rendering Skybox | Any `RenderPassEvent` | Applies from the next frame |
+| Property | Description                                              | Default                | Range                 | Runtime change              |
+|----------|----------------------------------------------------------|------------------------|-----------------------|-----------------------------|
+| Event    | When in URP's frame the lights are drawn (see Overview). | After Rendering Skybox | Any `RenderPassEvent` | Applies from the next frame |
 
 **Lights**
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Override Store | The store whose lights this feature draws. Empty: the default store, where components register unless they name a store of their own. | None (default store) | Any Light Store | Recreates the pass |
-| Camera Layers | Cameras draw the lights only if their culling mask includes one of these layers, as if the lights lived on them. Preview cameras never draw them. | Everything | Any layer mask | Immediate |
-| Light Intensity | Global multiplier on the brightness of every fake light the feature draws, whatever its type. | 1 | ≥ 0 | Immediate |
+| Property        | Description                                                                                                                                       | Default              | Range           | Runtime change     |
+|-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|-----------------|--------------------|
+| Override Store  | The store whose lights this feature draws. Empty: the default store, where components register unless they name a store of their own.             | None (default store) | Any Light Store | Recreates the pass |
+| Camera Layers   | Cameras draw the lights only if their culling mask includes one of these layers, as if the lights lived on them. Preview cameras never draw them. | Everything           | Any layer mask  | Immediate          |
+| Light Intensity | Global multiplier on the brightness of every fake light the feature draws, whatever its type.                                                     | 1                    | ≥ 0             | Immediate          |
 
 **Scattering**
 
 Each option is its own shader variant; see [Scattering](../README.md#scattering) for how they look and cost.
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Scattering Phase | How the haze scatters light toward the camera. Isotropic: equally in every direction, a beam looks the same from every side. Henyey-Greenstein: mostly onward, as real haze does, so beams look faint from the side and bright when looking toward their lamp. | Isotropic | Isotropic, Henyey-Greenstein | Immediate |
-| Scattering Anisotropy | With Henyey-Greenstein: how strongly the haze scatters onward (the mean cosine of the scattering angle). 0 scatters equally in every direction; real haze sits around 0.7 to 0.85. It redistributes light without adding any. Above 0.8 the glow toward the lamp gets less accurate (worst view ray off by up to about 14% at 0.8 and a third at 0.9 against an exact integral); the whole range stays available. | 0.7 | 0 to 0.95 | Immediate |
-| Distance Falloff | How the glow fades with the distance from the lamp. Range Scaled: inverse square scaled by the light's range, so a light looks the same at any size. Unity: URP's own light attenuation, inverse square in world units with URP's fade toward the range, so intensity means what a Unity Light's does. | Range Scaled | Range Scaled, Unity | Immediate |
-| Lamp Glare | How bright a light gets at its lamp. None: the lamp has a small size (2% of the range), keeping the glow next to it finite. Point: a point lamp, glaring where rays pass close to it. | None | None, Point | Immediate |
+| Property              | Description                                                                                                                                                                                                                                                                                                                                                                                                       | Default      | Range                        | Runtime change |
+|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|------------------------------|----------------|
+| Scattering Phase      | How the haze scatters light toward the camera. Isotropic: equally in every direction, a beam looks the same from every side. Henyey-Greenstein: mostly onward, as real haze does, so beams look faint from the side and bright when looking toward their lamp.                                                                                                                                                    | Isotropic    | Isotropic, Henyey-Greenstein | Immediate      |
+| Scattering Anisotropy | With Henyey-Greenstein: how strongly the haze scatters onward (the mean cosine of the scattering angle). 0 scatters equally in every direction; real haze sits around 0.7 to 0.85. It redistributes light without adding any. Above 0.8 the glow toward the lamp gets less accurate (worst view ray off by up to about 14% at 0.8 and a third at 0.9 against an exact integral); the whole range stays available. | 0.7          | 0 to 0.95                    | Immediate      |
+| Distance Falloff      | How the glow fades with the distance from the lamp. Range Scaled: inverse square scaled by the light's range, so a light looks the same at any size. Unity: URP's own light attenuation, inverse square in world units with URP's fade toward the range, so intensity means what a Unity Light's does.                                                                                                            | Range Scaled | Range Scaled, Unity          | Immediate      |
+| Lamp Glare            | How bright a light gets at its lamp. None: the lamp has a small size (2% of the range), keeping the glow next to it finite. Point: a point lamp, glaring where rays pass close to it.                                                                                                                                                                                                                             | None         | None, Point                  | Immediate      |
 
 **Fidelity**
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Fidelity Features | Optional parts of the rendering, each trading quality against cost: Scene Depth, Clip Boxes, Near Plane Fade, Wide Cone Precision, Spot Light LODs. See [Fidelity Features](../README.md#fidelity-features) for what each does and costs. | All but Wide Cone Precision | Any combination | Scene Depth and Spot Light LODs recreate the pass; the others apply immediately |
-| Near Plane Fade Distance | Distance past the near clipping plane, along the view direction, over which the glow fades in (with Near Plane Fade on). | 0.5 | ≥ 0.001 | Immediate |
+| Property                 | Description                                                                                                                                                                                                                               | Default                     | Range           | Runtime change                                                                  |
+|--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|-----------------|---------------------------------------------------------------------------------|
+| Fidelity Features        | Optional parts of the rendering, each trading quality against cost: Scene Depth, Clip Boxes, Near Plane Fade, Wide Cone Precision, Spot Light LODs. See [Fidelity Features](../README.md#fidelity-features) for what each does and costs. | All but Wide Cone Precision | Any combination | Scene Depth and Spot Light LODs recreate the pass; the others apply immediately |
+| Near Plane Fade Distance | Distance past the near clipping plane, along the view direction, over which the glow fades in (with Near Plane Fade on).                                                                                                                  | 0.5                         | ≥ 0.001         | Immediate                                                                       |
 
 **Memory**
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Dynamic Buffer Count | GPU buffers that per-frame data (dynamic lights' transforms, dynamic clip boxes) rotates through; each frame writes the next one, so the GPU can still read the frames before. 3 covers a GPU running one to two frames behind; 2 saves memory where it runs at most one frame behind; 1 rewrites a buffer the GPU may still be reading (a stall, or moving lights a frame off), fine without dynamic lights or boxes. | 3 | 1 to 3 | Inspector only; used when the store's GPU buffers are first created |
+| Property             | Description                                                                                                                                                                                                                                                                                                                                                                                                            | Default | Range  | Runtime change                                                      |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|--------|---------------------------------------------------------------------|
+| Dynamic Buffer Count | GPU buffers that per-frame data (dynamic lights' transforms, dynamic clip boxes) rotates through; each frame writes the next one, so the GPU can still read the frames before. 3 covers a GPU running one to two frames behind; 2 saves memory where it runs at most one frame behind; 1 rewrites a buffer the GPU may still be reading (a stall, or moving lights a frame off), fine without dynamic lights or boxes. | 3       | 1 to 3 | Inspector only; used when the store's GPU buffers are first created |
 
 **Spot Lights**
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Spot Light Descriptor | Proxy mesh LODs for spot lights, picked per light by its size on screen. See [Spot Light Proxy Array](SpotLightProxyArrayDescriptor.md). | None (built-in set) | Any Spot Light Proxy Array | Recreates the pass |
-| Max Spot Lights | Most spot lights drawn per camera, static and dynamic together. Visible lights past it are skipped, with a warning. | 65536 | ≥ 1 | Immediate |
-| Spot Light Buffer Size | Initial capacity, in spot lights, of the store's GPU buffers; they grow when needed. The line under the field shows the GPU memory it allocates. | 256 | ≥ 1 (allocates at least 64, rounded up to a power of two) | Inspector only; used when the store's GPU buffers are first created |
-| Spot Light Shader | `Hidden/Fuluma/Analytical/SpotLight`, filled in by the Editor when empty so builds include it. | The package's shader | Shader | Recreates the pass |
+| Property               | Description                                                                                                                                      | Default              | Range                                                     | Runtime change                                                      |
+|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|-----------------------------------------------------------|---------------------------------------------------------------------|
+| Spot Light Descriptor  | Proxy mesh LODs for spot lights, picked per light by its size on screen. See [Spot Light Proxy Array](SpotLightProxyArrayDescriptor.md).         | None (built-in set)  | Any Spot Light Proxy Array                                | Recreates the pass                                                  |
+| Max Spot Lights        | Most spot lights drawn per camera, static and dynamic together. Visible lights past it are skipped, with a warning.                              | 65536                | ≥ 1                                                       | Immediate                                                           |
+| Spot Light Buffer Size | Initial capacity, in spot lights, of the store's GPU buffers; they grow when needed. The line under the field shows the GPU memory it allocates. | 256                  | ≥ 1 (allocates at least 64, rounded up to a power of two) | Inspector only; used when the store's GPU buffers are first created |
+| Spot Light Shader      | `Hidden/Fuluma/Analytical/SpotLight`, filled in by the Editor when empty so builds include it.                                                   | The package's shader | Shader                                                    | Recreates the pass                                                  |
 
 **Clip Boxes**
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Clip Box Piece Limit | Most pieces a clipped light's ray is integrated in. Each piece costs one more integration on the pixels that have it; past the limit, further pieces merge into the last one (the gaps between them glow). 3 covers rooms with one cut-out; 5 is exact for any four boxes. | 3 | 3 to 5 | Immediate |
-| Clip Box Buffer Size | Initial capacity, in clip boxes, of the store's GPU box buffers; they grow when needed. | 16 | ≥ 1 (allocates at least 16, rounded up to a power of two) | Inspector only; used when the store's GPU buffers are first created |
+| Property             | Description                                                                                                                                                                                                                                                                | Default | Range                                                     | Runtime change                                                      |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|-----------------------------------------------------------|---------------------------------------------------------------------|
+| Clip Box Piece Limit | Most pieces a clipped light's ray is integrated in. Each piece costs one more integration on the pixels that have it; past the limit, further pieces merge into the last one (the gaps between them glow). 3 covers rooms with one cut-out; 5 is exact for any four boxes. | 3       | 3 to 5                                                    | Immediate                                                           |
+| Clip Box Buffer Size | Initial capacity, in clip boxes, of the store's GPU box buffers; they grow when needed.                                                                                                                                                                                    | 16      | ≥ 1 (allocates at least 16, rounded up to a power of two) | Inspector only; used when the store's GPU buffers are first created |
 
 **Light Buffer**
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Light Buffer Scale | Resolution the lights are shaded at, as a fraction of the camera's width and height (0.5 = a quarter of the pixels). Below 1 they draw into a smaller buffer that is then upscaled onto the camera. 1 draws straight onto the camera. See [Light Buffer](../README.md#light-buffer). | 0.5 | 0.01 to 1 | Between two values below 1: from the next camera; crossing 1 recreates the pass |
-| Light Buffer Lights | All: the buffer shades every light. Large Only: only lights at least Large Light Screen Size on screen, and lights the camera is inside of; smaller lights draw at full resolution (one more pass; consider All on tile-based mobile GPUs). | All | All, Large Only | Recreates the pass |
-| Large Light Screen Size | With Large Only: a light's bounding-sphere diameter, as a fraction of the screen height, from which it is shaded in the buffer. | 0.15 | 0.01 to 1 | Recreates the pass |
-| Light Buffer Upsample | Depth Aware keeps glow from bleeding over nearer geometry (3 texture reads per pixel, 6 at depth edges); Bilinear is the cheapest (1). | Depth Aware | Depth Aware, Bilinear | Recreates the pass |
-| Light Buffer Timing | When a downsampled buffer is shaded: Before Opaques (from URP's depth prepass), After Opaques, or Auto (before only when the renderer's settings already make URP render a depth prepass). | Auto | Auto, After Opaques, Before Opaques | Immediate |
-| Light Buffer Shader | `Hidden/Fuluma/LightBuffer`, filled in by the Editor when empty so builds include it. Used only with a downsampled buffer. | The package's shader | Shader | Recreates the pass |
+| Property                | Description                                                                                                                                                                                                                                                                          | Default              | Range                               | Runtime change                                                                  |
+|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|-------------------------------------|---------------------------------------------------------------------------------|
+| Light Buffer Scale      | Resolution the lights are shaded at, as a fraction of the camera's width and height (0.5 = a quarter of the pixels). Below 1 they draw into a smaller buffer that is then upscaled onto the camera. 1 draws straight onto the camera. See [Light Buffer](../README.md#light-buffer). | 0.5                  | 0.01 to 1                           | Between two values below 1: from the next camera; crossing 1 recreates the pass |
+| Light Buffer Lights     | All: the buffer shades every light. Large Only: only lights at least Large Light Screen Size on screen, and lights the camera is inside of; smaller lights draw at full resolution (one more pass; consider All on tile-based mobile GPUs).                                          | All                  | All, Large Only                     | Recreates the pass                                                              |
+| Large Light Screen Size | With Large Only: a light's bounding-sphere diameter, as a fraction of the screen height, from which it is shaded in the buffer.                                                                                                                                                      | 0.15                 | 0.01 to 1                           | Recreates the pass                                                              |
+| Light Buffer Upsample   | Depth Aware keeps glow from bleeding over nearer geometry (3 texture reads per pixel, 6 at depth edges); Bilinear is the cheapest (1).                                                                                                                                               | Depth Aware          | Depth Aware, Bilinear               | Recreates the pass                                                              |
+| Light Buffer Timing     | When a downsampled buffer is shaded: Before Opaques (from URP's depth prepass), After Opaques, or Auto (before only when the renderer's settings already make URP render a depth prepass).                                                                                           | Auto                 | Auto, After Opaques, Before Opaques | Immediate                                                                       |
+| Light Buffer Shader     | `Hidden/Fuluma/LightBuffer`, filled in by the Editor when empty so builds include it. Used only with a downsampled buffer.                                                                                                                                                           | The package's shader | Shader                              | Recreates the pass                                                              |
 
 ## Scripting
 
-| Member | Description |
-|---|---|
-| `RenderPassEvent` | The pass event. |
-| `OverrideStore` | The store drawn; null means `LightStore.Default`. Reading it never creates the default store. |
-| `Store` | The store actually drawn: `OverrideStore`, or `LightStore.Default`. |
-| `CameraLayers`, `LightIntensity` | Camera filter and global intensity. |
-| `ScatteringPhase`, `ScatteringAnisotropy`, `DistanceFalloff`, `LampGlare` | Scattering settings; each switches the shader variant at once, without recreating the pass. |
-| `FidelityFeatures` | All fidelity features as one flags value; changed bits are applied only. |
-| `UseSceneDepth`, `UseClipBoxes`, `UseNearPlaneFade`, `UseWideConePrecision`, `UseSpotLightLods` | One fidelity feature each. |
-| `NearPlaneFadeDistance`, `ClipBoxPieceLimit`, `MaxSpotLights`, `SpotLightDescriptor`, `SpotLightShader` | As in the Inspector. |
-| `LightBufferScale`, `LightBufferLights`, `LargeLightScreenSize`, `LightBufferUpsample`, `LightBufferTiming`, `LightBufferShader` | Light buffer settings. |
-| `SpotLightBufferSize`, `ClipBoxBufferSize`, `DynamicBufferCount` | Read-only: the capacities used when a store's GPU buffers are created. |
+| Member                                                                                                                           | Description                                                                                   |
+|----------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| `RenderPassEvent`                                                                                                                | The pass event.                                                                               |
+| `OverrideStore`                                                                                                                  | The store drawn; null means `LightStore.Default`. Reading it never creates the default store. |
+| `Store`                                                                                                                          | The store actually drawn: `OverrideStore`, or `LightStore.Default`.                           |
+| `CameraLayers`, `LightIntensity`                                                                                                 | Camera filter and global intensity.                                                           |
+| `ScatteringPhase`, `ScatteringAnisotropy`, `DistanceFalloff`, `LampGlare`                                                        | Scattering settings; each switches the shader variant at once, without recreating the pass.   |
+| `FidelityFeatures`                                                                                                               | All fidelity features as one flags value; changed bits are applied only.                      |
+| `UseSceneDepth`, `UseClipBoxes`, `UseNearPlaneFade`, `UseWideConePrecision`, `UseSpotLightLods`                                  | One fidelity feature each.                                                                    |
+| `NearPlaneFadeDistance`, `ClipBoxPieceLimit`, `MaxSpotLights`, `SpotLightDescriptor`, `SpotLightShader`                          | As in the Inspector.                                                                          |
+| `LightBufferScale`, `LightBufferLights`, `LargeLightScreenSize`, `LightBufferUpsample`, `LightBufferTiming`, `LightBufferShader` | Light buffer settings.                                                                        |
+| `SpotLightBufferSize`, `ClipBoxBufferSize`, `DynamicBufferCount`                                                                 | Read-only: the capacities used when a store's GPU buffers are created.                        |
 
 Pointing the feature at another store, for example one per loaded level:
 
