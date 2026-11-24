@@ -22,25 +22,25 @@ For a fake light that follows an existing Unity spot `Light`, use [Fake Light (L
 
 ## Properties
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Light Settings > Color | Light color. Its alpha is an extra brightness multiplier (0 = off, 1 = full), for example to fade a light without touching its intensity; the line under the field shows the resulting brightness. | White, alpha 1 | RGBA8 | Immediate |
-| Light Settings > Intensity | Brightness multiplier (HDR). Stored as a half on the GPU: up to about 65504, with about three significant digits. | 1 | ≥ 0 | Immediate |
-| Light Settings > Range | Distance from the apex at which the glow fades to zero and the volume ends. | 5 | ≥ 0 | Immediate |
-| Light Settings > Cone Angles | Inner angle (full brightness inside it; the angular falloff starts there) and outer angle (the edge of the volume), as full angles in degrees, on one slider. The inner angle never exceeds the outer one. Cones wider than about 160 degrees need the Wide Cone Precision fidelity feature for exact glow near the axis. | 20 / 30 | 0 to 179.8 | Immediate |
-| Override Store | Light store to register the light in. Empty: the default store (`LightStore.Default`). | None | Any Light Store | Re-registers the light |
-| Sync Transform | On: the light follows its Transform every frame (dynamic). Off: it is static and moves only when `ApplyTransform()` is called. See [Static vs Dynamic Lights](../README.md#static-vs-dynamic-lights). | Off | | Re-registers the light (new pool) |
-| Clip Boxes | Four slots, each a clip box and its role (Keep or Subtract). An empty box leaves the slot unused. The inspector explains under a slot why its box has no effect (another store, disabled, already used). See [Clip Boxes](../README.md#clip-boxes). | All unused | 4 slots | Immediate |
+| Property                     | Description                                                                                                                                                                                                                                                                                                               | Default        | Range           | Runtime change                    |
+|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------|-----------------|-----------------------------------|
+| Light Settings > Color       | Light color. Its alpha is an extra brightness multiplier (0 = off, 1 = full), for example to fade a light without touching its intensity; the line under the field shows the resulting brightness.                                                                                                                        | White, alpha 1 | RGBA8           | Immediate                         |
+| Light Settings > Intensity   | Brightness multiplier (HDR). Stored as a half on the GPU: up to about 65504, with about three significant digits.                                                                                                                                                                                                         | 1              | ≥ 0             | Immediate                         |
+| Light Settings > Range       | Distance from the apex at which the glow fades to zero and the volume ends.                                                                                                                                                                                                                                               | 5              | ≥ 0             | Immediate                         |
+| Light Settings > Cone Angles | Inner angle (full brightness inside it; the angular falloff starts there) and outer angle (the edge of the volume), as full angles in degrees, on one slider. The inner angle never exceeds the outer one. Cones wider than about 160 degrees need the Wide Cone Precision fidelity feature for exact glow near the axis. | 20 / 30        | 0 to 179.8      | Immediate                         |
+| Override Store               | Light store to register the light in. Empty: the default store (`LightStore.Default`).                                                                                                                                                                                                                                    | None           | Any Light Store | Re-registers the light            |
+| Sync Transform               | On: the light follows its Transform every frame (dynamic). Off: it is static and moves only when `ApplyTransform()` is called. See [Static vs Dynamic Lights](../README.md#static-vs-dynamic-lights).                                                                                                                     | Off            |                 | Re-registers the light (new pool) |
+| Clip Boxes                   | Four slots, each a clip box and its role (Keep or Subtract). An empty box leaves the slot unused. The inspector explains under a slot why its box has no effect (another store, disabled, already used). See [Clip Boxes](../README.md#clip-boxes).                                                                       | All unused     | 4 slots         | Immediate                         |
 
 ## Scripting
 
-| Member | Description |
-|---|---|
-| `Data` | The light settings (`SpotLightData`); setting it pushes them to the store at once. |
-| `OverrideStore`, `SyncTransform` | As in the Inspector. |
-| `ClipBoxes` | The four clip box slots (`ClipBoxSlots`, a struct); assign a changed copy to apply it. |
-| `ApplyTransform()` | Copies the current position and rotation into the store (static lights only). |
-| `ApplyData()` | Pushes the serialized settings to the store, after changing them by other means than `Data`. |
+| Member                           | Description                                                                                  |
+|----------------------------------|----------------------------------------------------------------------------------------------|
+| `Data`                           | The light settings (`SpotLightData`); setting it pushes them to the store at once.           |
+| `OverrideStore`, `SyncTransform` | As in the Inspector.                                                                         |
+| `ClipBoxes`                      | The four clip box slots (`ClipBoxSlots`, a struct); assign a changed copy to apply it.       |
+| `ApplyTransform()`               | Copies the current position and rotation into the store (static lights only).                |
+| `ApplyData()`                    | Pushes the serialized settings to the store, after changing them by other means than `Data`. |
 
 Fading a light out through its color's alpha:
 

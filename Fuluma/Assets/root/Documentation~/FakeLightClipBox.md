@@ -26,20 +26,20 @@ and costs.
 
 ## Properties
 
-| Property | Description | Default | Range | Runtime change |
-|---|---|---|---|---|
-| Override Store | Light store to register the box in. Empty: the default store (`LightStore.Default`). Only lights in the same store can use it. | None | Any Light Store | Re-registers the box |
-| Sync Transform | On: the box follows its Transform every frame (dynamic). Off: it is static and moves only when `ApplyTransform()` is called. | Off | | Re-registers the box |
-| Shape | Center and size of the box in this Transform's space (rotation and scale apply). | Center 0, size 1 | Any | Immediate |
+| Property       | Description                                                                                                                    | Default          | Range           | Runtime change       |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------|------------------|-----------------|----------------------|
+| Override Store | Light store to register the box in. Empty: the default store (`LightStore.Default`). Only lights in the same store can use it. | None             | Any Light Store | Re-registers the box |
+| Sync Transform | On: the box follows its Transform every frame (dynamic). Off: it is static and moves only when `ApplyTransform()` is called.   | Off              |                 | Re-registers the box |
+| Shape          | Center and size of the box in this Transform's space (rotation and scale apply).                                               | Center 0, size 1 | Any             | Immediate            |
 
 ## Scripting
 
-| Member | Description |
-|---|---|
-| `Shape` | The box's center and size (`ClipBoxData`); setting it pushes the change to the store. |
-| `OverrideStore`, `SyncTransform` | As in the Inspector. |
-| `ApplyTransform()` | Copies the Transform's current matrix into the store (static boxes only). |
-| `TryGetRegistration(out store, out handle)` | The store and handle of the box while it is registered. |
+| Member                                      | Description                                                                           |
+|---------------------------------------------|---------------------------------------------------------------------------------------|
+| `Shape`                                     | The box's center and size (`ClipBoxData`); setting it pushes the change to the store. |
+| `OverrideStore`, `SyncTransform`            | As in the Inspector.                                                                  |
+| `ApplyTransform()`                          | Copies the Transform's current matrix into the store (static boxes only).             |
+| `TryGetRegistration(out store, out handle)` | The store and handle of the box while it is registered.                               |
 
 Boxes without components, through the store: a room that keeps a lamp in, with a pillar cut out.
 

@@ -27,31 +27,31 @@ boxes of its own store, each as Keep or Subtract (`ClipBoxReference`).
 
 The asset has no settings. Its inspector shows read-only readouts while the store is allocated:
 
-| Readout | Description |
-|---|---|
-| Epoch | The generation of the store's memory; it changes on every allocation and release, and handles from another epoch are dead. |
-| Static / dynamic spot lights | Count and capacity of each pool. |
-| CPU buffers memory usage | Native memory of the spot light pools. |
+| Readout                      | Description                                                                                                                |
+|------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| Epoch                        | The generation of the store's memory; it changes on every allocation and release, and handles from another epoch are dead. |
+| Static / dynamic spot lights | Count and capacity of each pool.                                                                                           |
+| CPU buffers memory usage     | Native memory of the spot light pools.                                                                                     |
 
 ## Scripting
 
-| Member | Description |
-|---|---|
-| `Default` | The shared default store. |
-| `AddSpotLight(Placement, SpotLightData)` | Adds a static spot light; returns its handle. |
-| `AddSpotLight(Transform, SpotLightData)` | Adds a dynamic spot light that follows the Transform every frame. |
-| `SetSpotLight(handle, SpotLightData)` | Replaces a light's color, intensity, range and angles. |
-| `SetSpotLightPlacement(handle, Placement)` | Moves a static light. |
-| `SetSpotLightPlacements(handles, placements)` | Moves many static lights in one Burst job; returns how many moved. |
-| `AddClipBox(Placement or float4x4 or Transform, ClipBoxData)` | Adds a static box (placement or matrix, scale and shear included) or a dynamic one. |
-| `SetClipBoxShape(handle, ClipBoxData)`, `SetClipBoxPlacement(handle, …)` | Reshapes any box; moves a static box. |
-| `SetClipBoxes(light, references)` / `SetClipBoxes(light, ClipBoxSlots)` | Sets a light's boxes, from handles or from a component's slots. |
-| `TryGetClipBoxes(light, output, out count)` | Reads a light's boxes back. |
-| `Contains(handle)` | Whether a light or box handle is still alive in this store. |
-| `Remove(handle)` | Removes a light or a box. |
-| `ClearSpotLights()`, `ClearClipBoxes()`, `Clear()` | Removes every light, every box, or both; the memory stays allocated. |
-| `SpotLightCount`, `StaticSpotLightCount`, `DynamicSpotLightCount`, `ClipBoxCount` | Counts. |
-| `MaxClipBoxes`, `MaxClipBoxesPerLight` | 32767 boxes per store, 4 per light. |
+| Member                                                                            | Description                                                                         |
+|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| `Default`                                                                         | The shared default store.                                                           |
+| `AddSpotLight(Placement, SpotLightData)`                                          | Adds a static spot light; returns its handle.                                       |
+| `AddSpotLight(Transform, SpotLightData)`                                          | Adds a dynamic spot light that follows the Transform every frame.                   |
+| `SetSpotLight(handle, SpotLightData)`                                             | Replaces a light's color, intensity, range and angles.                              |
+| `SetSpotLightPlacement(handle, Placement)`                                        | Moves a static light.                                                               |
+| `SetSpotLightPlacements(handles, placements)`                                     | Moves many static lights in one Burst job; returns how many moved.                  |
+| `AddClipBox(Placement or float4x4 or Transform, ClipBoxData)`                     | Adds a static box (placement or matrix, scale and shear included) or a dynamic one. |
+| `SetClipBoxShape(handle, ClipBoxData)`, `SetClipBoxPlacement(handle, …)`          | Reshapes any box; moves a static box.                                               |
+| `SetClipBoxes(light, references)` / `SetClipBoxes(light, ClipBoxSlots)`           | Sets a light's boxes, from handles or from a component's slots.                     |
+| `TryGetClipBoxes(light, output, out count)`                                       | Reads a light's boxes back.                                                         |
+| `Contains(handle)`                                                                | Whether a light or box handle is still alive in this store.                         |
+| `Remove(handle)`                                                                  | Removes a light or a box.                                                           |
+| `ClearSpotLights()`, `ClearClipBoxes()`, `Clear()`                                | Removes every light, every box, or both; the memory stays allocated.                |
+| `SpotLightCount`, `StaticSpotLightCount`, `DynamicSpotLightCount`, `ClipBoxCount` | Counts.                                                                             |
+| `MaxClipBoxes`, `MaxClipBoxesPerLight`                                            | 32767 boxes per store, 4 per light.                                                 |
 
 A component owning lights it adds from code (OnEnable runs again after an Editor play-mode switch, so the lights
 come back after a store release):
