@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: code-lights-gone-on-second-play
+expected_outcome: |
+  Finds that Enter Play Mode Options are on with domain reload off (EditorSettings m_EnterPlayModeOptionsEnabled 1, m_EnterPlayModeOptions 3), so the static s_spawned flag stays true across play sessions and Start skips spawning, while Fuluma releases its stores on every play mode switch so the lights (and handles) from the first session are gone. Proposes resetting the statics on entering play mode (e.g. RuntimeInitializeOnLoadMethod SubsystemRegistration) or re-adding when the handles are no longer contained in the store, and asks before changing the script.
+context:
+  scaffold_script: place-files.sh

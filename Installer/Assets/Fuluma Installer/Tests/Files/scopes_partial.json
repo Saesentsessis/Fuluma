@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "com.unity.test-framework": "1.6.0",
+    "PACKAGE_ID": "PACKAGE_VERSION"
+  },
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.saesentsessis.fuluma"
+      ]
+    }
+  ]
+}

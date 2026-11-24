@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: android-slower-after-msaa
+expected_outcome: |
+  Explains that with MSAA the downsampled light buffer can't read the camera's multisampled depth attachment, so URP copies the depth to a texture and the buffer reads that copy; on Mali phones this roughly doubles the buffer's cost (a 0.5 buffer then costs about as much as full resolution or more), so the MSAA change is the likely cause. Proposes MSAA off on the mobile URP asset, or Light Buffer Timing Before Opaques, or full resolution, to be measured, and asks before changing.
+context:
+  scaffold_script: place-files.sh

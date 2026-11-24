@@ -76,3 +76,8 @@ crashlytics-build.properties
 
 # Claude
 .claude
+
+# Burst compiler caches. Burst writes Library/BurstCache under the working directory Unity was started from, so a
+# batch-mode Unity started from another folder leaves a cache there too (with .meta files once it is inside Assets).
+**/[Ll]ibrary/[Bb]urst[Cc]ache/
+**/[Ll]ibrary/[Bb]urst[Cc]ache.meta

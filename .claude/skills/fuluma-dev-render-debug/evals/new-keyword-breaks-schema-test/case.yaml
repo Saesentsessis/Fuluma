@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: new-keyword-breaks-schema-test
+expected_outcome: |
+  Says the new keyword needs a KeywordGroup in Editor/Scripts/Build/FulumaShaderKeywords.cs (e.g. an OnOff group) added to the spotLight schema, an Automatic rule in FulumaShaderStrippingSource.cs mapping the feature's new setting to the keyword, updated expected counts in the preview test (1440 variants double to 2880 with the new on/off group, the one-value-each count stays per pass as defined), and the docs (docs/dev/VariantStripping.md, the README stripping section). Asks before editing.
+context:
+  scaffold_script: place-files.sh

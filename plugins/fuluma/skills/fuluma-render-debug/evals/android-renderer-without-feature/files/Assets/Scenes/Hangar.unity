@@ -1,0 +1,98 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &900
+GameObject:
+  m_Name: Main Camera
+  m_TagString: MainCamera
+  m_IsActive: 1
+--- !u!20 &901
+Camera:
+  m_GameObject: {fileID: 900}
+  m_Enabled: 1
+  m_ClearFlags: 1
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &902
+MonoBehaviour:
+  m_GameObject: {fileID: 900}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderType: 0
+  m_RendererIndex: -1
+  m_RenderPostProcessing: 1
+--- !u!1 &1100
+GameObject:
+  m_Name: Fake Spot Light 11
+  m_IsActive: 1
+--- !u!114 &1101
+MonoBehaviour:
+  m_GameObject: {fileID: 1100}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: efcbc53ee21f44e895f3ca7e1d02d2d4, type: 3}
+  m_EditorClassIdentifier: Saesentsessis.Fuluma.Runtime::Saesentsessis.Fuluma.Rendering.Components.FakeSpotLight
+  overrideStore: {fileID: 0}
+  syncTransform: 0
+  clipBoxes:
+    Slot0:
+      Box: {fileID: 0}
+      Role: 0
+    Slot1:
+      Box: {fileID: 0}
+      Role: 0
+    Slot2:
+      Box: {fileID: 0}
+      Role: 0
+    Slot3:
+      Box: {fileID: 0}
+      Role: 0
+  data:
+    Color:
+      serializedVersion: 2
+      rgba: 4294954073
+    Intensity: 2
+    Range: 8
+    InnerAngleDegrees: 30
+    OuterAngleDegrees: 45
+--- !u!4 &1101
+Transform:
+  m_GameObject: {fileID: 1100}
+  m_LocalPosition: {x: 0, y: 4, z: 0}
+--- !u!1 &1200
+GameObject:
+  m_Name: Fake Spot Light 12
+  m_IsActive: 1
+--- !u!114 &1201
+MonoBehaviour:
+  m_GameObject: {fileID: 1200}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: efcbc53ee21f44e895f3ca7e1d02d2d4, type: 3}
+  m_EditorClassIdentifier: Saesentsessis.Fuluma.Runtime::Saesentsessis.Fuluma.Rendering.Components.FakeSpotLight
+  overrideStore: {fileID: 0}
+  syncTransform: 0
+  clipBoxes:
+    Slot0:
+      Box: {fileID: 0}
+      Role: 0
+    Slot1:
+      Box: {fileID: 0}
+      Role: 0
+    Slot2:
+      Box: {fileID: 0}
+      Role: 0
+    Slot3:
+      Box: {fileID: 0}
+      Role: 0
+  data:
+    Color:
+      serializedVersion: 2
+      rgba: 4294954073
+    Intensity: 2
+    Range: 8
+    InnerAngleDegrees: 30
+    OuterAngleDegrees: 45
+--- !u!4 &1201
+Transform:
+  m_GameObject: {fileID: 1200}
+  m_LocalPosition: {x: 5, y: 4, z: 0}

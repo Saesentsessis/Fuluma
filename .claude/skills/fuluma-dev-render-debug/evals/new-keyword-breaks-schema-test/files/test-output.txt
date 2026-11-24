@@ -1,0 +1,5 @@
+Saesentsessis.Fuluma.Tests.Editor.FulumaShaderStrippingTests.Schema_MatchesTheShadersKeywords(spotLight) [FAILED]
+  The shader declares keywords that schema 'spotLight' doesn't list:
+  Expected: <empty>
+  But was:  < "_FULUMA_SOFT_EDGES" >
+Saesentsessis.Fuluma.Tests.Editor.FulumaShaderStrippingTests.Preview_CountsEveryPassWithItsOwnGroups("spotLight",1440,2) [PASSED]

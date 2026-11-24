@@ -1,0 +1,7 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!30 &1
+GraphicsSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 16
+  m_CustomRenderPipeline: {fileID: 11400000, guid: 1c2d3e4f5a6b4c7d8e9f0a1b2c3d4e5f, type: 2}

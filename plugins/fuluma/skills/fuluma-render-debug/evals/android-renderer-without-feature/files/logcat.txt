@@ -1,0 +1,7 @@
+11-24 10:02:11.204  8812  8840 D Unity   : SystemInfo CPU = ARM64 FP ASIMD AES, Cores = 8, Memory = 7612mb
+11-24 10:02:11.231  8812  8840 D Unity   : Vulkan API version: 1.3.247
+11-24 10:02:11.232  8812  8840 D Unity   : Renderer: Mali-G57 MC2
+11-24 10:02:11.395  8812  8840 D Unity   : Initialize engine version: 6000.3.4f1
+11-24 10:02:12.902  8812  8840 I Unity   : Loading scene Hangar
+11-24 10:02:13.410  8812  8840 I Unity   : HangarDoors: initialized 4 doors
+11-24 10:02:14.016  8812  8840 W Unity   : The referenced script (Unknown) on this Behaviour is missing!

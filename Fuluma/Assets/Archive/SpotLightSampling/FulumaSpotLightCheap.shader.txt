@@ -1,0 +1,98 @@
+// Cheap variant of FulumaSpotLight.shader: identical passes and includes, but FULUMA_SPOT_ONE_SAMPLE makes the
+// quadrature take one sample per segment (1-point Gauss-Legendre in the airlight angle) instead of three. Pick it with
+// FulumaRenderFeature's spot light shader. Keep the two files in sync apart from the name and the define.
+//
+// Analytical (fake) volumetric spot light, drawn by FulumaSpotLightRenderPass: per light pool, one instanced draw per
+// pass (inside / outside, see below), one instance per light, over the fixed proxy mesh from SpotLightProxyMesh.cs.
+//
+// Layout follows URP's Lit shader:
+//   FulumaSpotLightInput.hlsl        GPU data, buffers, material constants, scene depth access
+//   FulumaSpotLightScattering.hlsl   in-scattering: inverse-square falloff, Gauss-Legendre quadrature per segment
+//   FulumaSpotLightForwardPass.hlsl  vertex/fragment programs
+//   ../ShaderLibrary/Intersections.hlsl  ray vs. sphere-capped cone (shared by analytical lights)
+Shader "Hidden/Fuluma/Analytical/SpotLightCheap"
+{
+    Properties
+    {
+        _Intensity("Intensity", Float) = 1.0
+    }
+
+    SubShader
+    {
+        Tags
+        {
+            "RenderPipeline" = "UniversalPipeline"
+            "RenderType" = "Transparent"
+            "Queue" = "Transparent"
+            "IgnoreProjector" = "True"
+        }
+
+        // Every light is drawn by one of two passes, chosen per instance in the vertex shader
+        // (FulumaCameraNearSpotProxy); the other pass collapses it.
+
+        // Pass 0: the camera may be inside or touching the light's proxy. Back faces only, no depth test: exactly one
+        // fragment per covered pixel even with the camera inside the volume. Occlusion comes from the scene depth in
+        // the fragment program.
+        Pass
+        {
+            Name "FulumaSpotLightInside"
+            Tags { "LightMode" = "FulumaSpotLight" }
+
+            Blend One One
+            ZWrite Off
+            ZTest Always
+            Cull Front
+
+            HLSLPROGRAM
+            // Structured buffers in the vertex stage.
+            #pragma target 4.5
+
+            #pragma vertex FulumaSpotLightVertex
+            #pragma fragment FulumaSpotLightFragment
+
+            // Scene depth source, set per camera by the pass: depth input attachment (single- or multisampled), or
+            // _CameraDepthTexture where depth can't be read as an input attachment. Local on purpose: URP's global
+            // keywords of the same name don't leak in.
+            #pragma multi_compile_local _ _DEPTH_AS_INPUT_ATTACHMENT _DEPTH_AS_INPUT_ATTACHMENT_MSAA
+
+            #define FULUMA_SPOT_PASS_INSIDE
+            #define FULUMA_SPOT_ONE_SAMPLE
+            #include "FulumaSpotLightInput.hlsl"
+            #include "FulumaSpotLightForwardPass.hlsl"
+            ENDHLSL
+        }
+
+        // Pass 1: the camera is clearly outside the proxy. Front faces with a depth test against the scene: still one
+        // fragment per covered pixel, and pixels whose proxy surface is behind geometry are rejected before the
+        // fragment program runs (the volume lies behind its front faces, so nothing visible is lost).
+        Pass
+        {
+            Name "FulumaSpotLightOutside"
+            Tags { "LightMode" = "FulumaSpotLight" }
+
+            Blend One One
+            ZWrite Off
+            ZTest LEqual
+            Cull Back
+
+            HLSLPROGRAM
+            // Structured buffers in the vertex stage.
+            #pragma target 4.5
+
+            #pragma vertex FulumaSpotLightVertex
+            #pragma fragment FulumaSpotLightFragment
+
+            // Scene depth source, set per camera by the pass: depth input attachment (single- or multisampled), or
+            // _CameraDepthTexture where depth can't be read as an input attachment. Local on purpose: URP's global
+            // keywords of the same name don't leak in.
+            #pragma multi_compile_local _ _DEPTH_AS_INPUT_ATTACHMENT _DEPTH_AS_INPUT_ATTACHMENT_MSAA
+
+            #define FULUMA_SPOT_ONE_SAMPLE
+            #include "FulumaSpotLightInput.hlsl"
+            #include "FulumaSpotLightForwardPass.hlsl"
+            ENDHLSL
+        }
+    }
+
+    Fallback Off
+}

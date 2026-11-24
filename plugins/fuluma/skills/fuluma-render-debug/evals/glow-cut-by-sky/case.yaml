@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: glow-cut-by-sky
+expected_outcome: |
+  Finds that the Fuluma feature's event is 300 (After Rendering Opaques): URP draws the skybox after that event, over the glow wherever only sky is behind it. Proposes setting the event to After Rendering Skybox (400, the default for new features), notes the effect on transparents, and asks before changing.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: linked-lights-ignore-night-script
+expected_outcome: |
+  Finds that every LinkedFakeLight uses syncMode 1 (Editor Only): in play mode and in players it ignores changes to its Light, including enabling it, until Refresh() is called; the Lights start disabled (m_Enabled 0), so the fake lights never register. Proposes Sync Mode Every Frame, or calling Refresh() on the LinkedFakeLight after NightCycle toggles the Light, and asks before changing.
+context:
+  scaffold_script: place-files.sh

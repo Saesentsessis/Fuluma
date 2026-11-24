@@ -1,0 +1,8 @@
+diff --git a/Assets/Settings/URP-Mobile.asset b/Assets/Settings/URP-Mobile.asset
+@@ -21,7 +21,7 @@ MonoBehaviour:
+   m_RequireDepthTexture: 1
+   m_RequireOpaqueTexture: 0
+   m_SupportsHDR: 1
+-  m_MSAA: 1
++  m_MSAA: 4
+   m_RenderScale: 1

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: keep-box-misses-the-beam
+expected_outcome: |
+  Finds that the Hallway Light (at x 0, pointing down, range 5) uses a Keep box centered at x 12 with size 4 x 3 x 10, which doesn't overlap its beam: a light with Keep boxes only exists inside them, so nothing of it is left. The office box encloses its light. Proposes moving or resizing the hallway box to enclose the hallway (or the right box in the slot), and asks before changing.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: light-buffer-slower-after-msaa
+expected_outcome: |
+  Finds that the dev project's URP asset (and quality settings) use MSAA 4x: with MSAA the light buffer reads URP's depth copy instead of the camera's depth attachment, which roughly doubles its cost on Mali (measured 17.0 to 32.1 M cycles at 0.5 on the 15C). Proposes pinning -fulumaMsaa 1 for measurements or turning MSAA off in the asset, and asks before changing the user's asset.

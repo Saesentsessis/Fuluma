@@ -1,0 +1,31 @@
+{
+  "dependencies": {
+    "com.saesentsessis.unity-collections-specialized": "0.3.0",
+    "com.saesentsessis.unity-shaderworks": "0.1.1",
+    "com.saesentsessis.unity-meshgen": "0.2.0",
+    "com.unity.collections": "6.7.0",
+    "com.unity.ide.rider": "3.0.38",
+    "com.unity.profiling.systemmetrics.mali": "1.1.4",
+    "com.unity.render-pipelines.universal": "17.7.0",
+    "com.unity.modules.androidjni": "1.0.0",
+    "com.unity.modules.assetbundle": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.particlesystem": "1.0.0",
+    "com.unity.modules.screencapture": "1.0.0",
+    "com.unity.modules.tetgen": "1.0.0",
+    "com.unity.modules.unityanalytics": "1.0.0"
+  },
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.saesentsessis.unity-collections-specialized",
+        "com.saesentsessis.unity-meshgen",
+        "com.saesentsessis.unity-shaderworks"
+      ]
+    }
+  ]
+}

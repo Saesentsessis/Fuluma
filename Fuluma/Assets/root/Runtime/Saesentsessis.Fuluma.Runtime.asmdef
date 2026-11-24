@@ -1,0 +1,22 @@
+{
+    "name": "Saesentsessis.Fuluma.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "Unity.Collections.Specialized",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.Collections",
+        "Unity.Mathematics",
+        "Unity.Burst",
+        "Saesentsessis.MeshGeneration.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

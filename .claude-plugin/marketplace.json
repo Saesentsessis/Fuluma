@@ -1,0 +1,15 @@
+{
+  "name": "fuluma",
+  "description": "Claude Code skills for Fuluma, analytical fake volumetric lights for Unity URP.",
+  "owner": {
+    "name": "Saesentsessis",
+    "url": "https://github.com/Saesentsessis"
+  },
+  "plugins": [
+    {
+      "name": "fuluma",
+      "source": "./plugins/fuluma",
+      "description": "Skills for setting up, debugging and tuning Fuluma fake lights and its URP render feature in a Unity project."
+    }
+  ]
+}
