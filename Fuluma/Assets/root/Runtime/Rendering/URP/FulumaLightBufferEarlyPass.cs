@@ -1,7 +1,7 @@
 #if UNITY_6000_0_OR_NEWER
 #define FULUMA_RENDER_GRAPH
 #endif
-#if !UNITY_6000_3_OR_NEWER
+#if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
 #define FULUMA_COMPATIBILITY_PATH
 #endif
 
@@ -12,7 +12,7 @@ using UnityEngine.Rendering.RenderGraphModule;
 #endif
 
 #if FULUMA_COMPATIBILITY_PATH
-// URP 17 (Unity 6.0-6.2) marks the Compatibility Mode members obsolete; URP 14 (2022.3) has no other path.
+// URP 17 (Unity 6.0-6.3) marks the Compatibility Mode members obsolete; URP 14 (2022.3) has no other path.
 #pragma warning disable 618, 672
 #endif
 

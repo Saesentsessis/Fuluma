@@ -115,6 +115,20 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		[StructLayout(LayoutKind.Sequential)]
 		public readonly struct CameraState
 		{
+#if UNITY_6000_0_OR_NEWER
+			public static CameraState From(UniversalCameraData cameraData)
+				=> new(cameraData.renderer, cameraData.isSceneViewCamera, cameraData.camera, cameraData.requiresDepthTexture,
+					cameraData.renderType, cameraData.clearDepth, cameraData.targetTexture,
+					cameraData.cameraTargetDescriptor.msaaSamples);
+#endif
+
+#if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
+			public static CameraState From(in CameraData cameraData)
+				=> new(cameraData.renderer, cameraData.isSceneViewCamera, cameraData.camera, cameraData.requiresDepthTexture,
+					cameraData.renderType, cameraData.clearDepth, cameraData.targetTexture,
+					cameraData.cameraTargetDescriptor.msaaSamples);
+#endif
+
 			public readonly RenderTexture TargetTexture;
 			public readonly int CullingMask;
 			public readonly CameraRenderType RenderType;
@@ -149,20 +163,6 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			public bool RequiresDepthTexture => (State & Flags.RequiresDepthTexture) != 0;
 
 			public bool ClearDepth => (State & Flags.ClearDepth) != 0;
-
-#if UNITY_6000_0_OR_NEWER
-			public static CameraState From(UniversalCameraData cameraData)
-				=> new(cameraData.renderer, cameraData.isSceneViewCamera, cameraData.camera, cameraData.requiresDepthTexture,
-					cameraData.renderType, cameraData.clearDepth, cameraData.targetTexture,
-					cameraData.cameraTargetDescriptor.msaaSamples);
-#endif
-
-#if !UNITY_6000_3_OR_NEWER
-			public static CameraState From(in CameraData cameraData)
-				=> new(cameraData.renderer, cameraData.isSceneViewCamera, cameraData.camera, cameraData.requiresDepthTexture,
-					cameraData.renderType, cameraData.clearDepth, cameraData.targetTexture,
-					cameraData.cameraTargetDescriptor.msaaSamples);
-#endif
 
 			/// <summary>
 			/// The camera's yes/no properties, packed into one byte.

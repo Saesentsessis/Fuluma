@@ -44,7 +44,9 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	/// </para>
 	/// <para>
 	/// This file holds what doesn't depend on how URP runs the pass: settings, materials, culling and the draw loop.
-	/// <c>FulumaSpotLightRenderPass.RenderGraph.cs</c> records it into URP's render graph (Unity 6).
+	/// <c>FulumaSpotLightRenderPass.RenderGraph.cs</c> records it into URP's render graph (Unity 6);
+	/// <c>FulumaSpotLightRenderPass.Compatibility.cs</c> runs it through <c>Execute</c> (Unity 2022.3, and Compatibility
+	/// Mode on 6.0-6.3).
 	/// </para>
 	/// </remarks>
 #if UNITY_6000_5_OR_NEWER
@@ -142,10 +144,12 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 
 		/// <summary>
 		/// Whether URP runs passes through <c>Execute</c> (Compatibility Mode) instead of the render graph: always on
-		/// Unity 2022.3 (URP 14), the Graphics settings' checkbox on 6.0-6.2, never from 6.3.
+		/// Unity 2022.3 (URP 14); the Graphics settings' checkbox on 6.0-6.2, and on 6.3 with Unity's
+		/// <c>URP_COMPATIBILITY_MODE</c> define; never otherwise. Changing it recreates URP's pipeline, and with it every
+		/// feature's pass, so a pass reads it once (<see cref="UsesCompatibilityPath"/>).
 		/// </summary>
 		internal static bool CompatibilityModeActive
-#if UNITY_6000_3_OR_NEWER
+#if UNITY_6000_4_OR_NEWER || (UNITY_6000_3_OR_NEWER && !URP_COMPATIBILITY_MODE)
 			=> false;
 #elif UNITY_6000_0_OR_NEWER
 			=> GraphicsSettings.TryGetRenderPipelineSettings<RenderGraphSettings>(out var settings)
@@ -273,6 +277,11 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 
 		private readonly bool _depthAsInputAttachment;
+
+		/// <summary>
+		/// <see cref="CompatibilityModeActive"/> when this pass was created.
+		/// </summary>
+		private readonly bool _compatibilityPath;
 
 		private SpotLightGpuMirror _mirror;
 
@@ -465,6 +474,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			int initialClipBoxCapacity = SpotLightGpuMirror.MinimumClipBoxCapacity,
 			int dynamicBufferCount = SpotLightGpuMirror.DefaultRingLength)
 		{
+			_compatibilityPath = CompatibilityModeActive;
 			_lightBufferLights = lightBufferLights;
 			_useSceneDepth = useSceneDepth;
 			_largeLightScreenSize = math.max(LightBufferScaling.MinLargeLightScreenSize, largeLightScreenSize);
@@ -514,6 +524,12 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// Store this pass draws.
 		/// </summary>
 		public LightStore Store => _mirror?.Store;
+
+		/// <summary>
+		/// Whether URP runs this pass through <c>Execute</c> (Compatibility Mode, read when the pass was created) instead of
+		/// recording it into the render graph.
+		/// </summary>
+		public bool UsesCompatibilityPath => _compatibilityPath;
 
 		/// <summary>
 		/// Whether full-resolution draws read scene depth as an input attachment (true) or from
@@ -847,7 +863,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// </summary>
 		private bool NeedsCameraDepthTexture(int msaaSamples)
 			=> _useSceneDepth
-			   && (CompatibilityModeActive
+			   && (_compatibilityPath
 			       || (_depthAsInputAttachment == false && (_lightBuffer == null || SplitsLargeLights))
 			       || (_lightBuffer != null && msaaSamples > 1));
 

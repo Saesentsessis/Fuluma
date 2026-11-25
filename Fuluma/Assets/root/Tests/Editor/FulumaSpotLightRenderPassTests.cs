@@ -744,7 +744,7 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 			try
 			{
 				pass.ConfigureDepthSource(1);
-				if (FulumaSpotLightRenderPass.CompatibilityModeActive)
+				if (pass.UsesCompatibilityPath)
 				{
 					// The Compatibility path reads URP's depth texture for every draw.
 					Assert.AreEqual(ScriptableRenderPassInput.Depth, pass.input & ScriptableRenderPassInput.Depth);

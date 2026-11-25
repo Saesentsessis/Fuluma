@@ -142,6 +142,12 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		[System.NonSerialized] private bool _validating;
 
 		/// <summary>
+		/// Whether <see cref="AddRenderPasses"/> already looked for this feature's renderer data again (once per pass: on
+		/// URP 14 the lookup scans every loaded object and allocates).
+		/// </summary>
+		[System.NonSerialized] private bool _rendererDataRetried;
+
+		/// <summary>
 		/// The optional rendering features in use. Setting it applies only what changed: <see cref="FidelityFeatures.SceneDepth"/>
 		/// and <see cref="FidelityFeatures.SpotLightLods"/> recreate the pass, the others apply immediately.
 		/// </summary>
@@ -630,7 +636,11 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			if (_spotLightRenderPass.LightBufferBeforeOpaquesPass != null)
 			{
 				// Auto reads the renderer's settings; find them if this feature was created before its renderer was listed.
-				_spotLightRenderPass.RendererData ??= FindRendererData();
+				if (_spotLightRenderPass.RendererData == null && _rendererDataRetried == false)
+				{
+					_rendererDataRetried = true;
+					_spotLightRenderPass.RendererData = FindRendererData();
+				}
 				renderer.EnqueuePass(_spotLightRenderPass.LightBufferBeforeOpaquesPass);
 			}
 		}
@@ -683,6 +693,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			_spotLightRenderPass.MaxVisibleLights = maxSpotLights;
 			_spotLightRenderPass.LightBufferTiming = lightBufferTiming;
 			_spotLightRenderPass.RendererData = FindRendererData();
+			_rendererDataRetried = false;
 		}
 
 #if UNITY_EDITOR

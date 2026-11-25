@@ -1,4 +1,4 @@
-#if !UNITY_6000_3_OR_NEWER
+#if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
 #define FULUMA_COMPATIBILITY_PATH
 #endif
 
@@ -9,13 +9,14 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-// URP 17 (Unity 6.0-6.2) marks the Compatibility Mode members obsolete; URP 14 (2022.3) has no other path.
+// URP 17 (Unity 6.0-6.3) marks the Compatibility Mode members obsolete; URP 14 (2022.3) has no other path.
 #pragma warning disable 618, 672
 
 namespace Saesentsessis.Fuluma.Rendering.URP
 {
 	/// <summary>
-	/// The pass's Compatibility path: URP 14 (Unity 2022.3), and URP 17 with Compatibility Mode on (Unity 6.0-6.2). URP
+	/// The pass's Compatibility path: URP 14 (Unity 2022.3), and URP 17 with Compatibility Mode on (Unity 6.0-6.2, and 6.3
+	/// with Unity's <c>URP_COMPATIBILITY_MODE</c> define). URP
 	/// calls <see cref="Execute"/> instead of recording a render graph; the draws go into a command buffer executed at
 	/// once.
 	/// </summary>
