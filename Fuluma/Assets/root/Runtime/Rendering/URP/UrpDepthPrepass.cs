@@ -22,6 +22,51 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	/// </summary>
 	internal static class UrpDepthPrepass
 	{
+#if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
+		/// <summary>
+		/// Compatibility Mode (URP 14, and URP 17's <c>UniversalRenderer.Setup</c>): where the depth a full depth prepass
+		/// rendered is when Fuluma's early pass runs (<c>AfterRenderingPrePasses</c>), re-evaluated from public settings:
+		/// <list type="bullet">
+		/// <item>the depth texture is needed (by the camera or any pass, Fuluma's included) and URP can't copy depth, or
+		/// the renderer's Depth Texture Mode is "Force Prepass": the prepass renders into <c>_CameraDepthTexture</c>;</item>
+		/// <item>depth priming (Forced, or Auto off mobile; forward, first camera to write depth, not a reflection or
+		/// depth-only camera; URP 17: no MSAA): the prepass renders into the camera's depth attachment, and URP copies it
+		/// into <c>_CameraDepthTexture</c> only after Fuluma's pass, at the same event.</item>
+		/// </list>
+		/// Prepasses this can't see (the Scene view, gizmos, other features' normals) are answered "none": the buffer is then
+		/// drawn after the opaques, which is always correct. Unlike <see cref="Renders"/>, the answer can be
+		/// <see cref="CompatibilityDepth.Unusable"/>: a prepass whose depth Fuluma can't read in time.
+		/// </summary>
+		/// <param name="passNeedsDepthTexture">Whether Fuluma's own passes ask URP for the depth texture.</param>
+		public static CompatibilityDepth FindCompatibilityDepth(UniversalRendererData data, in CameraState camera,
+			bool passNeedsDepthTexture)
+		{
+			if (data == null || camera.UniversalRenderer == false || camera.IsSceneView)
+				return CompatibilityDepth.None;
+
+			// Deferred: the prepass only exists for normals there. Not handled.
+			if (data.renderingMode == RenderingMode.Deferred || IsDeferredPlus(data))
+				return CompatibilityDepth.None;
+
+			// URP 14 and 17.0 build the prepass from the opaque layers; later versions may use the prepass layers. Either
+			// missing the camera answers "none".
+			if ((data.opaqueLayerMask & camera.CullingMask) == 0 || PrepassLayersMiss(data, camera))
+				return CompatibilityDepth.None;
+
+			var canCopyDepth = CanCopyDepth(camera.MsaaSamples);
+			if (UsesDepthPrimingCompatibility(data, camera, canCopyDepth))
+			{
+				// URP 14 primes MSAA cameras too: their attachment can't be sampled, and the depth texture isn't copied yet.
+				return camera.MsaaSamples > 1 ? CompatibilityDepth.Unusable : CompatibilityDepth.Attachment;
+			}
+
+			var needsDepth = camera.RequiresDepthTexture || passNeedsDepthTexture;
+			var prepass = needsDepth && (canCopyDepth == false || data.copyDepthMode == CopyDepthMode.ForcePrepass);
+			return prepass ? CompatibilityDepth.Texture : CompatibilityDepth.None;
+		}
+#endif
+
+
 		/// <summary>
 		/// True when the settings make URP render a full depth prepass for this camera. Its depth is then, after
 		/// <c>AfterRenderingPrePasses</c>, in the camera's depth attachment with depth priming
@@ -94,6 +139,45 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			return webGl == false && firstToWriteDepth && offscreenDepth == false && camera.MsaaSamples == 1;
 		}
 
+#if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
+		private static bool UsesDepthPrimingCompatibility(UniversalRendererData data, in CameraState camera, bool canCopyDepth)
+		{
+#if UNITY_ANDROID || UNITY_IOS || UNITY_TVOS || UNITY_EMBEDDED_LINUX
+			const bool recommended = false;
+#else
+			const bool recommended = true;
+#endif
+			var requested = (recommended && data.depthPrimingMode == DepthPrimingMode.Auto)
+			                || data.depthPrimingMode == DepthPrimingMode.Forced;
+			if (requested == false || canCopyDepth == false)
+				return false;
+
+			var webGl = Application.platform == RuntimePlatform.WebGLPlayer;
+			var firstToWriteDepth = camera.RenderType == CameraRenderType.Base || camera.ClearDepth;
+			var offscreenDepth = camera.TargetTexture != null && camera.TargetTexture.format == RenderTextureFormat.Depth;
+#if UNITY_6000_0_OR_NEWER
+			// URP 17 doesn't prime MSAA cameras.
+			if (camera.MsaaSamples > 1)
+				return false;
+#endif
+			return webGl == false && firstToWriteDepth && offscreenDepth == false && camera.IsReflection == false;
+		}
+
+		private static bool IsDeferredPlus(UniversalRendererData data)
+#if UNITY_6000_1_OR_NEWER
+			=> data.renderingMode == RenderingMode.DeferredPlus;
+#else
+			=> false;
+#endif
+
+		private static bool PrepassLayersMiss(UniversalRendererData data, in CameraState camera)
+#if UNITY_6000_2_OR_NEWER
+			=> (data.prepassLayerMask & camera.CullingMask) == 0;
+#else
+			=> false;
+#endif
+#endif
+
 		private static bool CanCopyDepth(int msaaSamples)
 		{
 			var msaa = msaaSamples > 1;
@@ -149,7 +233,8 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 				State = (renderer is UnityEngine.Rendering.Universal.UniversalRenderer ? Flags.UniversalRenderer : Flags.None)
 				        | (isSceneView ? Flags.SceneView : Flags.None)
 				        | (requiresDepthTexture ? Flags.RequiresDepthTexture : Flags.None)
-				        | (clearDepth ? Flags.ClearDepth : Flags.None);
+				        | (clearDepth ? Flags.ClearDepth : Flags.None)
+				        | (camera.cameraType == CameraType.Reflection ? Flags.Reflection : Flags.None);
 				MsaaSamples = (byte)math.clamp(msaaSamples, 1, byte.MaxValue);
 			}
 
@@ -164,6 +249,8 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 
 			public bool ClearDepth => (State & Flags.ClearDepth) != 0;
 
+			public bool IsReflection => (State & Flags.Reflection) != 0;
+
 			/// <summary>
 			/// The camera's yes/no properties, packed into one byte.
 			/// </summary>
@@ -174,8 +261,38 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 				UniversalRenderer = 1 << 0,
 				SceneView = 1 << 1,
 				RequiresDepthTexture = 1 << 2,
-				ClearDepth = 1 << 3
+				ClearDepth = 1 << 3,
+				Reflection = 1 << 4
 			}
 		}
+
+#if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
+		/// <summary>
+		/// Where Fuluma's early pass finds a depth prepass's depth in Compatibility Mode
+		/// (<see cref="FindCompatibilityDepth"/>).
+		/// </summary>
+		public enum CompatibilityDepth : byte
+		{
+			/// <summary>
+			/// URP renders no full depth prepass the settings show.
+			/// </summary>
+			None,
+
+			/// <summary>
+			/// In <c>_CameraDepthTexture</c>.
+			/// </summary>
+			Texture,
+
+			/// <summary>
+			/// In the camera's depth attachment (depth priming).
+			/// </summary>
+			Attachment,
+
+			/// <summary>
+			/// A prepass runs, but its depth can't be read in time (depth priming with MSAA on URP 14).
+			/// </summary>
+			Unusable
+		}
+#endif
 	}
 }

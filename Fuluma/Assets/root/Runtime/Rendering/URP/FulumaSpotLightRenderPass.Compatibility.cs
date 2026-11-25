@@ -94,13 +94,61 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 
 		/// <summary>
-		/// <see cref="LightBufferTiming"/> before the opaques (called by <see cref="FulumaLightBufferEarlyPass"/>). Not
-		/// implemented on this path yet: the main pass draws everything after the opaques.
+		/// <see cref="LightBufferTiming"/> before the opaques: draws the light buffer's downsample and low-resolution lights
+		/// from URP's depth prepass, right after the prepasses (called by <see cref="FulumaLightBufferEarlyPass"/>). The main
+		/// pass then composites it. Without a prepass whose depth can be read now, nothing is drawn here and the main pass
+		/// does everything after the opaques.
 		/// </summary>
 		internal void ExecuteLightBufferBeforeOpaques(ScriptableRenderContext context, ref RenderingData renderingData)
 		{
+			ref var cameraData = ref renderingData.cameraData;
+			var camera = cameraData.camera;
+
 			_preparedCamera = null;
 			_earlyCamera = null;
+
+			if (_lightBuffer == null || RendersDepthOnly(cameraData) || TryPrepareCamera(ref cameraData, false, out _) == false)
+				return;
+
+			_preparedCamera = camera;
+
+			if (TryGetPrepassDepth(ref cameraData, out var prepassDepth, out var isAttachment) == false)
+				return;
+
+			if (SplitsLargeLights && LowResolutionLightsLastFrame(camera) == false)
+				return;
+
+			var cmd = CommandBufferPool.Get();
+			DrawLowResolution(cmd, ref cameraData, prepassDepth,
+				SplitsLargeLights ? DrawSet.Large : DrawSet.All,
+				SplitsLargeLights ? FulumaProfiling.DrawLowResolutionSampler : FulumaProfiling.DrawSampler);
+			BindCameraTargets(cmd, ref cameraData);
+			context.ExecuteCommandBuffer(cmd);
+			CommandBufferPool.Release(cmd);
+
+			_earlyDepthIsAttachment = isAttachment;
+			_earlyCamera = camera;
+		}
+
+		/// <summary>
+		/// Where URP's depth prepass put this camera's depth when this runs (<see cref="UrpDepthPrepass.FindCompatibilityDepth"/>):
+		/// the camera's depth attachment with depth priming (<paramref name="depth"/>), else <c>_CameraDepthTexture</c>
+		/// (<paramref name="depth"/> null: the light buffer's shader reads it). With
+		/// <see cref="URP.LightBufferTiming.BeforeOpaques"/> the early pass's own request makes the prepass.
+		/// </summary>
+		private bool TryGetPrepassDepth(ref CameraData cameraData, out RTHandle depth, out bool isAttachment)
+		{
+			var forced = _lightBufferTiming == LightBufferTiming.BeforeOpaques;
+			var passNeedsDepthTexture = forced || (input & ScriptableRenderPassInput.Depth) != 0;
+			var found = UrpDepthPrepass.FindCompatibilityDepth(RendererData, UrpDepthPrepass.CameraState.From(cameraData),
+				passNeedsDepthTexture);
+
+			if (found == UrpDepthPrepass.CompatibilityDepth.None && forced)
+				found = UrpDepthPrepass.CompatibilityDepth.Texture;
+
+			isAttachment = found == UrpDepthPrepass.CompatibilityDepth.Attachment;
+			depth = isAttachment ? cameraData.renderer.cameraDepthTargetHandle : null;
+			return found is UrpDepthPrepass.CompatibilityDepth.Texture or UrpDepthPrepass.CompatibilityDepth.Attachment;
 		}
 
 		/// <summary>
@@ -144,22 +192,24 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		private void DrawThroughLightBuffer(CommandBuffer cmd, ref CameraData cameraData, DrawSet drawSet,
 			ProfilingSampler drawSampler)
 		{
-			DrawLowResolution(cmd, ref cameraData, drawSet, drawSampler);
+			DrawLowResolution(cmd, ref cameraData, cameraData.renderer.cameraDepthTargetHandle, drawSet, drawSampler);
 			CompositeLightBuffer(cmd, ref cameraData);
 		}
 
 		/// <summary>
-		/// Low-resolution depth from the camera's depth (none when the lights don't use scene depth), then the lights of
-		/// <paramref name="drawSet"/> into the light buffer.
+		/// Low-resolution depth from <paramref name="sceneDepth"/> (none when the lights don't use scene depth), then the
+		/// lights of <paramref name="drawSet"/> into the light buffer.
 		/// </summary>
-		private void DrawLowResolution(CommandBuffer cmd, ref CameraData cameraData, DrawSet drawSet,
+		/// <param name="sceneDepth">The camera's depth attachment, used where it can be sampled; else (or null) URP's
+		/// <c>_CameraDepthTexture</c>.</param>
+		private void DrawLowResolution(CommandBuffer cmd, ref CameraData cameraData, RTHandle sceneDepth, DrawSet drawSet,
 			ProfilingSampler drawSampler)
 		{
 			var descriptor = cameraData.cameraTargetDescriptor;
 			_lightBuffer.AllocateTargets(descriptor, _useSceneDepth);
 
 			if (_useSceneDepth)
-				_lightBuffer.ExecuteDownsample(cmd, descriptor.width, descriptor.height, cameraData.renderer.cameraDepthTargetHandle);
+				_lightBuffer.ExecuteDownsample(cmd, descriptor.width, descriptor.height, sceneDepth);
 
 			_lightBuffer.BeginLightDraw(cmd, _useSceneDepth);
 
@@ -171,15 +221,22 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 
 		/// <summary>
-		/// The light buffer onto the camera color, then the camera's targets bound again: URP 14 skips binding targets it
-		/// believes are bound, so the passes after this one would otherwise draw into the light buffer's.
+		/// The light buffer onto the camera color, then the camera's targets bound again.
 		/// </summary>
 		private void CompositeLightBuffer(CommandBuffer cmd, ref CameraData cameraData)
 		{
+			_lightBuffer.ExecuteComposite(cmd, cameraData.renderer.cameraColorTargetHandle);
+			BindCameraTargets(cmd, ref cameraData);
+		}
+
+		/// <summary>
+		/// URP 14 skips binding targets it believes are bound, so after switching to the light buffer's targets the passes
+		/// after this one would otherwise draw into them.
+		/// </summary>
+		private static void BindCameraTargets(CommandBuffer cmd, ref CameraData cameraData)
+		{
 			var renderer = cameraData.renderer;
-			var cameraColor = renderer.cameraColorTargetHandle;
-			_lightBuffer.ExecuteComposite(cmd, cameraColor);
-			CoreUtils.SetRenderTarget(cmd, cameraColor, renderer.cameraDepthTargetHandle);
+			CoreUtils.SetRenderTarget(cmd, renderer.cameraColorTargetHandle, renderer.cameraDepthTargetHandle);
 		}
 
 		private readonly struct CommandBufferDrawCommands : IDrawCommands
