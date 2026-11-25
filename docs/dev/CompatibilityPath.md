@@ -79,9 +79,21 @@ player per mode) and the dev project (6000.7.0b4). No throttling (thermal status
   compiler is unavailable here). On the G77 it doesn't show, and at full resolution 6000.7's depth input attachment
   saves URP's depth copy (11T: 7.8 M vs 13.1 M pixels; 15C: 4.1 M vs 6.4 M).
 - **RenderGraph-only: LargeOnly writes one extra full screen of pixels** (15C +1.17 M = 1600x720, 11T +2.6 M =
-  2400x1080) compared with Compatibility in 6000.0; not at full resolution or with all lights in the buffer. Most of
-  RenderGraph's LargeOnly difference (11T +3.7%). Which pass it is needs a frame capture (RenderDoc on a Windows
-  player); open.
+  2400x1080) compared with Compatibility in 6000.0; most of RenderGraph's LargeOnly difference (11T +3.7%). Found with
+  RenderDoc captures of 6000.0 Windows Vulkan players at 1600x720 (`Fuluma6000/Builds/Win_Off`, `Win_On`): both frames
+  have the same draws; the difference is a render pass. The depth-aware composite samples the camera's depth
+  attachment as a texture, so RenderGraph runs it in a render pass of its own (camera color, no depth). URP's
+  `DrawTransparentObjects` then needs color and depth, so RenderGraph begins another render pass, reloading both: on a
+  tile GPU a full screen of load work, which Mali counts as fragment threads and pixels. The stress scene has no
+  transparent objects; on the Compatibility path Unity's Vulkan backend doesn't begin a render pass for that empty
+  pass, so it never pays the reload. With all lights in the buffer the same split exists, but there Compatibility pays
+  for URP's depth copy (it always asks for the depth texture) and RenderGraph doesn't, so they even out; with
+  LargeOnly both make the copy (the small full-resolution lights read it).
+  - In a scene with transparent objects both paths begin that pass, so the difference shows only when the
+    transparents pass is empty.
+  - Possible fix (not done): when URP makes `_CameraDepthTexture` anyway (LargeOnly without depth input attachment,
+    MSAA), the depth-aware composite could read that copy and keep the depth attachment attached read-only, like the
+    bilinear composite, so it merges with the transparents pass on every path.
 - RenderGraph runs 2-5 M more fragment threads than Compatibility in 6000.0; apart from LargeOnly, at no measurable
   cost.
 - The overlay's per-pass GPU timers (`ProfilingScope`) disagree with the counters on these tile GPUs (the same frame
