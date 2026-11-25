@@ -31,6 +31,7 @@ The old path is called the **compatibility path** below, whichever Unity version
 | 4. Compatibility path, light buffer | Done, `91d8f32` |
 | 5. Compatibility path, early pass | Done, `5c65f17` |
 | 6. Test projects (URP asset with the feature in all four), CI matrix | Done |
+| Backbuffer depth load (URP, RenderGraph): RenderGraph's extra fragment threads explained | Done, see "Cost on phones" |
 | Composite merge experiment (RenderGraph) | Kept on branch `dev/urp_compatibility_mode_composite_merge` (`5ba5116`), not merged (user's choice): it removes RenderGraph's extra LargeOnly reload but not its cost; see "Cost on phones" |
 | 7. Release 0.2.0: installer, docs, CHANGELOG | |
 | Profiling project on 2022.3 (git-ignored), players, phone measurements | After the suite passes on 2022.3 and 6000.0 |
@@ -79,6 +80,8 @@ player per mode) and the dev project (6000.7.0b4). No throttling (thermal status
   issue cycles about the same: likely 6000.7's shader code generation on Bifrost (not confirmed; Mali's offline
   compiler is unavailable here). On the G77 it doesn't show, and at full resolution 6000.7's depth input attachment
   saves URP's depth copy (11T: 7.8 M vs 13.1 M pixels; 15C: 4.1 M vs 6.4 M).
+- Mali's "Pixels" counter behaves like the area of the tiles each render pass processes, not shaded pixels: an extra
+  full-screen render pass adds one screen of pixels even when it draws nothing.
 - **RenderGraph-only: LargeOnly writes one extra full screen of pixels** (15C +1.17 M = 1600x720, 11T +2.6 M =
   2400x1080) compared with Compatibility in 6000.0; most of RenderGraph's LargeOnly difference (11T +3.7%). Found with
   RenderDoc captures of 6000.0 Windows Vulkan players at 1600x720 (`Fuluma6000/Builds/Win_Off`, `Win_On`): both frames
@@ -103,10 +106,49 @@ player per mode) and the dev project (6000.7.0b4). No throttling (thermal status
     cycles unchanged (11T 10.40 M -> 10.39 M; 15C 47.72 M -> 47.84 M): the reload is cheap on Mali. Not merged because
     of that and its trade-off: depth written after URP's copy (another feature's geometry between the copy and Fuluma's
     pass) no longer reaches the light buffer.
-  - What does cost RenderGraph 1.5-4% (11T) remains open: 2.6-5.3 M more fragment threads than Compatibility in every
-    configuration, with the same pixels written after the experiment.
-- RenderGraph runs 2-5 M more fragment threads than Compatibility in 6000.0; apart from LargeOnly, at no measurable
-  cost.
+  - The experiment didn't change cycles because the depth reload only moved: the composite's merged pass now loads the
+    camera depth at its start. The cost is the depth load itself (next bullet), not the extra render pass.
+- **RenderGraph's extra fragment threads are depth loads, and the first one is URP's, not Fuluma's** (found
+  2026-11-25). On Mali a render pass that loads a depth/stencil attachment runs a full screen of fragment threads that
+  sample it through the texture unit (Bifrost and Valhall preload the tile buffer with "frame shaders"; see Mesa's
+  Panfrost driver). Color loads showed no such cost here. Every RenderGraph frame on 6000.0 has one depth load more
+  than Compatibility, LargeOnly frames two:
+  - **The backbuffer depth.** URP's "Draw UIToolkit/uGUI Overlay" pass (`DrawScreenSpaceUIPass.RenderOverlay`) always
+    attaches the backbuffer depth `ReadWrite`, even with no canvas in the scene, and RenderGraph merges it into the
+    final blit's render pass. With an intermediate texture (here HDR, so for any such URP project) the backbuffer is
+    imported without `clearOnFirstUse`, so the native pass compiler loads it (`LoadReason.LoadImported`). The final
+    blit's color is a partial `Write` too (Load), but that one costs nothing. In Compatibility Mode the engine draws the
+    UI after URP, and the final blit pass starts with Don't Care. URP 17.7 (6000.7) imports the backbuffer depth the
+    same way; its final blit is `WriteAll`.
+  - **The camera depth after the depth-aware composite** (LargeOnly; see above).
+
+  Experiment: URP 17.0.4 embedded in `Fuluma6000` with two launch switches, `-urpFinalBlitWriteAll` (final blit color
+  Don't Care) and `-urpClearBackbufferDepth` (backbuffer depth `clearOnFirstUse`). Checked with RenderDoc on Windows
+  Vulkan: each switch changes only its own load action. Then on the phones (6000.0, the same stress setup as above, two
+  rounds; GPU cycles and fragment threads per frame in millions):
+
+  | 11T (Mali-G77) | Compat. | RenderGraph | + final blit WriteAll | + backbuffer depth cleared | both |
+  |---|---|---|---|---|---|
+  | Full resolution, cycles / threads | 16.04 / 30.23 | 16.16 / 32.86 | 16.14 / 32.89 | 16.04 / 30.24 | 16.02 / 30.24 |
+  | Light buffer 0.5, all lights | 6.16 / 22.54 | 6.25 / 25.19 | 6.24 / 25.22 | 6.02 / 22.55 | 6.02 / 22.53 |
+  | Light buffer 0.5, LargeOnly | 10.02 / 30.21 | 10.41 / 35.38 | 10.42 / 35.42 | 10.18 / 32.75 | 10.20 / 32.74 |
+
+  | 15C (Mali-G52) | Compat. | RenderGraph | + final blit WriteAll | + backbuffer depth cleared | both |
+  |---|---|---|---|---|---|
+  | Full resolution, cycles / threads | 79.99 / 15.85 | 80.12 / 17.87 | 79.94 / 17.74 | 79.82 / 15.91 | 79.97 / 15.84 |
+  | Light buffer 0.5, all lights | 27.78 / 10.91 | 27.84 / 13.76 | 27.96 / 13.70 | 27.87 / 11.87 | 27.67 / 11.78 |
+  | Light buffer 0.5, LargeOnly | 47.05 / 15.51 | 47.63 / 19.51 | 47.79 / 19.41 | 47.71 / 17.59 | 47.47 / 17.49 |
+
+  - Clearing the backbuffer depth removes one depth load. Fragment threads drop by one screen on the 11T (2.6 M) and
+    by 1.9 M on the 15C; texture issue cycles drop by 0.64 M and 0.6 M. On the 11T, GPU cycles drop 0.8% (full), 3.7%
+    (all lights in the buffer) and 2.2% (LargeOnly). On the 15C the change is within noise (±0.4%).
+  - With it, RenderGraph matches Compatibility at full resolution on both phones. With all lights in the buffer,
+    RenderGraph is 2.3% cheaper on the 11T: Compatibility pays for URP's depth copy, RenderGraph doesn't. LargeOnly
+    keeps the camera depth reload: +1.6% (11T) and +0.9-1.4% (15C), with 2.5 M (11T) and 2.1 M (15C) more threads.
+  - The second reload exists only when nothing after the composite needs the camera targets. In a scene with
+    transparent objects, Compatibility reloads too.
+  - Fuluma can't change the backbuffer import: it lives in `UniversalRenderer.CreateRenderGraphCameraRenderTargets`. A Unity bug report is
+    the proper route; until then this cost applies to any URP RenderGraph project on Mali, with or without Fuluma.
 - The overlay's per-pass GPU timers (`ProfilingScope`) disagree with the counters on these tile GPUs (the same frame
   shows a 12.3 ms downsample on Compatibility and 1.1 ms on RenderGraph): use the counters.
 - Straight-to-screen cameras on the compatibility path needed the composite flip (fixed in `046aff2`, verified on the
