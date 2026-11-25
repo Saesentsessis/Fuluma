@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Saesentsessis.Fuluma.Core;
+using Saesentsessis.Fuluma.Editor.Core;
 using Saesentsessis.Fuluma.Rendering.URP;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -77,7 +78,7 @@ namespace Saesentsessis.Fuluma.Editor.Components
 			{
 				result.AnyUniversalPipeline = true;
 
-				foreach (var renderer in RendererDataList(universal))
+				foreach (var renderer in UrpRendererDataList.Of(universal))
 				{
 					if (renderer != null)
 						draws |= ScanRenderer(renderer, overrideStore, result);
@@ -87,25 +88,6 @@ namespace Saesentsessis.Fuluma.Editor.Components
 			ScannedAssets.Add((asset, draws));
 			return draws;
 		}
-
-#if UNITY_6000_0_OR_NEWER
-		private static System.ReadOnlySpan<ScriptableRendererData> RendererDataList(UniversalRenderPipelineAsset asset)
-			=> asset.rendererDataList;
-#else
-		/// <summary>
-		/// URP 14 keeps the renderer list in a serialized field only.
-		/// </summary>
-		private static IEnumerable<ScriptableRendererData> RendererDataList(UniversalRenderPipelineAsset asset)
-		{
-			using var serialized = new UnityEditor.SerializedObject(asset);
-			var list = serialized.FindProperty("m_RendererDataList");
-			if (list == null || list.isArray == false)
-				yield break;
-
-			for (var i = 0; i < list.arraySize; i++)
-				yield return list.GetArrayElementAtIndex(i).objectReferenceValue as ScriptableRendererData;
-		}
-#endif
 
 		private static bool ScanRenderer(ScriptableRendererData renderer, LightStore overrideStore, Result result)
 		{

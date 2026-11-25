@@ -84,8 +84,10 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			if (needsDepth && canCopyDepth == false)
 				return false;
 
-			var webGl = Application.platform == RuntimePlatform.WebGLPlayer
-			            || SystemInfo.graphicsDeviceType == GraphicsDeviceType.WebGPU;
+			var webGl = Application.platform == RuntimePlatform.WebGLPlayer;
+#if UNITY_6000_0_OR_NEWER
+			webGl |= SystemInfo.graphicsDeviceType == GraphicsDeviceType.WebGPU;
+#endif
 			var firstToWriteDepth = camera.RenderType == CameraRenderType.Base || camera.ClearDepth;
 			var offscreenDepth = camera.TargetTexture != null && camera.TargetTexture.format == RenderTextureFormat.Depth;
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Saesentsessis.Fuluma.Editor.Core;
 using Saesentsessis.Fuluma.Rendering.URP;
 using Saesentsessis.Shaders.Stripping;
 using UnityEditor;
@@ -95,7 +96,7 @@ namespace Saesentsessis.Fuluma.Editor.Build
 				if (asset is not UniversalRenderPipelineAsset universal)
 					continue;
 
-				foreach (var renderer in universal.rendererDataList)
+				foreach (var renderer in UrpRendererDataList.Of(universal))
 				{
 					if (renderer == null)
 						continue;

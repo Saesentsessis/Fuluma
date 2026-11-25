@@ -744,8 +744,17 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 			try
 			{
 				pass.ConfigureDepthSource(1);
+				if (FulumaSpotLightRenderPass.CompatibilityModeActive)
+				{
+					// The Compatibility path reads URP's depth texture for every draw.
+					Assert.AreEqual(ScriptableRenderPassInput.Depth, pass.input & ScriptableRenderPassInput.Depth);
+					return;
+				}
+
 				Assert.AreEqual(ScriptableRenderPassInput.None, pass.input & ScriptableRenderPassInput.Depth);
+#if UNITY_6000_0_OR_NEWER
 				Assert.IsTrue(pass.requiresIntermediateTexture);
+#endif
 
 				// MSAA: the buffer's passes read single samples, so they need URP's resolved copy.
 				pass.ConfigureDepthSource(4);

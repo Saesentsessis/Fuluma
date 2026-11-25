@@ -53,6 +53,15 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		private static readonly int CameraDepthId = Shader.PropertyToID("_FulumaCameraDepth");
 		private static readonly Vector4 FullScaleBias = new(1f, 1f, 0f, 0f);
 
+		// Unity 2022.3 names the format usages FormatUsage; Unity 6 GraphicsFormatUsage.
+#if UNITY_6000_0_OR_NEWER
+		private const GraphicsFormatUsage BlendUsage = GraphicsFormatUsage.Blend;
+		private const GraphicsFormatUsage RenderUsage = GraphicsFormatUsage.Render;
+#else
+		private const FormatUsage BlendUsage = FormatUsage.Blend;
+		private const FormatUsage RenderUsage = FormatUsage.Render;
+#endif
+
 		/// <summary>
 		/// <c>ceil(size × scale)</c>, at least 1. The small slack keeps float rounding from adding a pixel when the product is
 		/// a whole number (1920 × 0.3).
@@ -63,7 +72,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// Packed 11:11:10 float when it can be blended into (half the bandwidth; no alpha needed), else RGBA half.
 		/// </summary>
 		private static GraphicsFormat PickLightFormat()
-			=> SystemInfo.IsFormatSupported(GraphicsFormat.B10G11R11_UFloatPack32, GraphicsFormatUsage.Blend)
+			=> SystemInfo.IsFormatSupported(GraphicsFormat.B10G11R11_UFloatPack32, BlendUsage)
 				? GraphicsFormat.B10G11R11_UFloatPack32
 				: GraphicsFormat.R16G16B16A16_SFloat;
 
@@ -71,7 +80,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// Eye depth in 32-bit float; 16-bit is a last resort (~0.1% relative steps).
 		/// </summary>
 		private static GraphicsFormat PickRawDepthFormat()
-			=> SystemInfo.IsFormatSupported(GraphicsFormat.R32_SFloat, GraphicsFormatUsage.Render)
+			=> SystemInfo.IsFormatSupported(GraphicsFormat.R32_SFloat, RenderUsage)
 				? GraphicsFormat.R32_SFloat
 				: GraphicsFormat.R16_SFloat;
 
