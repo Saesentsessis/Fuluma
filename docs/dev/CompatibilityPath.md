@@ -48,31 +48,46 @@ Both paths on 6.0–6.3 are covered by running the suite once per mode (decision
 warnings on 6000.7.0b4, 6000.3.0f1 (also with `URP_COMPATIBILITY_MODE`), 6000.0.85f2, 2022.3.62f3 and 2022.3.20f1
 (which resolves URP 14.0.10, Burst 1.8.25, Collections 2.6.2, Mathematics 1.3.3).
 
-## Cost on a phone (2026-11-25)
+## Cost on phones (2026-11-25)
 
-Xiaomi 15C (Mali-G52 MC2, Vulkan), the stress scene with 1024 frozen lights (433 drawn), MSAA 1, 22 s runs, GPU
-cycles per frame (Mali counters, average of the last 5 frames). Players: the 2022.3 profiling project
-(`M:/Unity/Projects/Fuluma2022`), the 6000.0 one (`M:/Unity/Projects/Fuluma6000`, one player per mode, two
-alternating rounds within 0.5% of each other) and the dev project (6000.7.0b4). All at 42.5 °C, no throttling.
+The stress scene with 1024 frozen lights (433 drawn), MSAA 1, four players, two alternating rounds of 22 s runs (rounds
+within 0.5-1%), GPU cycles per frame in millions (Mali counters, mean of the last 5 frames, both rounds). Players: the
+2022.3 profiling project (`M:/Unity/Projects/Fuluma2022`), the 6000.0 one (`M:/Unity/Projects/Fuluma6000`, one
+player per mode) and the dev project (6000.7.0b4). No throttling (thermal status 0 throughout).
 
-| Configuration | 2022.3 Compatibility | 6000.0 Compatibility | 6000.0 RenderGraph | 6000.7 RenderGraph |
+| Xiaomi 15C (Mali-G52 MC2, 1600x720) | 2022.3 Compat. | 6000.0 Compat. | 6000.0 RenderGraph | 6000.7 RenderGraph |
 |---|---|---|---|---|
-| Full resolution | 77.9 M | 79.9 M | 80.0 M | 83.7 M |
-| Light buffer 0.5, all lights | 26.5 M | 27.8 M | 27.9 M | 29.2 M |
-| Light buffer 0.5, LargeOnly | 45.1 M | 47.0 M | 47.7 M | 49.3 M |
+| Full resolution | 78.25 | 80.00 | 80.18 | 82.97 |
+| Light buffer 0.5, all lights | 26.47 | 27.81 | 27.99 | 29.06 |
+| Light buffer 0.5, LargeOnly | 45.11 | 46.93 | 47.72 | 49.22 |
 
-- **The paths cost the same in one Unity version** (6000.0: +0.1%, +0.4%, +1.5% for RenderGraph). The first comparison
-  (2022.3 Compatibility vs 6000.7 RenderGraph, ~7% apart) measured Unity versions, not paths.
-- **2022.3 → 6000.0 (+2.6%, both Compatibility):** about one more full screen of pixels written per frame (5.3 M →
-  6.4 M) and ~7 MB more external writes: URP 17 does more full-screen work around the frame, whatever the path.
-- **6000.0 → 6000.7 (+4.6%, both RenderGraph):** shader fragment cycles +5% in every configuration, including the
-  light buffer at 0.5 where the depth input attachment isn't used, with nearly the same ALU issue cycles (+1-3%). So
-  most of it isn't the input attachment; likely shader code generation in 6000.7 (beta) or URP 17.7's shader library.
-  Not confirmed (Mali's offline compiler is unavailable here). At full resolution 6000.7 also reads depth as an input
-  attachment: fewer texture issue cycles (5.0 M vs 7.9 M) and no depth copy (4.1 M vs 6.4 M pixels), no net gain.
-- RenderGraph runs 2-4 M more fragment threads than Compatibility in 6000.0 at no measurable cost.
+| Xiaomi 11T (Mali-G77 MC9, 2400x1080) | 2022.3 Compat. | 6000.0 Compat. | 6000.0 RenderGraph | 6000.7 RenderGraph |
+|---|---|---|---|---|
+| Full resolution | 15.23 | 16.01 | 16.19 | 15.88 |
+| Light buffer 0.5, all lights | 5.67 | 6.16 | 6.25 | 6.24 |
+| Light buffer 0.5, LargeOnly | 9.43 | 10.03 | 10.40 | 10.16 |
+
+- **The paths cost nearly the same in one Unity version** (6000.0, RenderGraph vs Compatibility): 15C +0.2%, +0.6%,
+  +1.7%; 11T +1.1%, +1.5%, +3.7%. The first comparison (2022.3 Compatibility vs 6000.7 RenderGraph) measured Unity
+  versions, not paths.
+- **2022.3 -> 6000.0 (both Compatibility): +2-3% (15C), +5-9% (11T).** About one more full screen of pixels written per
+  frame (15C 5.3 M -> 6.4 M, 11T 10.5 M -> 13.0 M) and more external writes (15C +7 MB, 11T +6 MB): URP 17 does more
+  full-screen work around the frame, whatever the path.
+- **6000.0 -> 6000.7 (both RenderGraph): +3-4% on the 15C, -2% to 0% on the 11T.** On the G52 shader fragment cycles rise
+  3-5% in every configuration, including the light buffer at 0.5 where the depth input attachment isn't used, with ALU
+  issue cycles about the same: likely 6000.7's shader code generation on Bifrost (not confirmed; Mali's offline
+  compiler is unavailable here). On the G77 it doesn't show, and at full resolution 6000.7's depth input attachment
+  saves URP's depth copy (11T: 7.8 M vs 13.1 M pixels; 15C: 4.1 M vs 6.4 M).
+- **RenderGraph-only: LargeOnly writes one extra full screen of pixels** (15C +1.17 M = 1600x720, 11T +2.6 M =
+  2400x1080) compared with Compatibility in 6000.0; not at full resolution or with all lights in the buffer. Most of
+  RenderGraph's LargeOnly difference (11T +3.7%). Which pass it is needs a frame capture (RenderDoc on a Windows
+  player); open.
+- RenderGraph runs 2-5 M more fragment threads than Compatibility in 6000.0; apart from LargeOnly, at no measurable
+  cost.
+- The overlay's per-pass GPU timers (`ProfilingScope`) disagree with the counters on these tile GPUs (the same frame
+  shows a 12.3 ms downsample on Compatibility and 1.1 ms on RenderGraph): use the counters.
 - Straight-to-screen cameras on the compatibility path needed the composite flip (fixed in `046aff2`, verified on the
-  phone with HDR and scene depth off).
+  15C with HDR and scene depth off).
 
 ## Compatibility Mode by version
 
