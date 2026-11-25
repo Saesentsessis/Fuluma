@@ -31,6 +31,12 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		private const string CameraDepthTextureKeywordName = "_FULUMA_CAMERA_DEPTH_TEXTURE";
 
 		/// <summary>
+		/// Samples the light buffer upside down: what a camera rendering straight to the backbuffer needs (see
+		/// <see cref="ExecuteComposite"/>).
+		/// </summary>
+		private static readonly Vector4 FlippedScaleBias = new(1f, -1f, 0f, 1f);
+
+		/// <summary>
 		/// Whether <paramref name="depth"/> can be sampled as this camera's scene depth: a render texture (not the
 		/// backbuffer's), single-sampled.
 		/// </summary>
@@ -153,7 +159,10 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// Adds the light buffer onto <paramref name="cameraColor"/>, upscaled as <see cref="Upsample"/> says (depth-aware
 		/// reads the same scene depth the downsample read). Leaves <paramref name="cameraColor"/> bound without depth.
 		/// </summary>
-		public void ExecuteComposite(CommandBuffer cmd, RTHandle cameraColor)
+		/// <param name="flip">The camera renders straight to the backbuffer (unflipped projection) on an API whose render
+		/// textures start at the top: the buffer, drawn with that projection, is then sampled upside down, as URP's own final
+		/// blit does (measured on Vulkan, Mali-G52: without it the buffer composited upside down).</param>
+		public void ExecuteComposite(CommandBuffer cmd, RTHandle cameraColor, bool flip)
 		{
 			using var profilerScope = new ProfilingScope(cmd, FulumaProfiling.CompositeSampler);
 
@@ -168,7 +177,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			// The composite blends onto the camera color, so it loads it.
 			CoreUtils.SetRenderTarget(cmd, cameraColor, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store,
 				ClearFlag.None, Color.clear);
-			Blitter.BlitTexture(cmd, _lightTarget, FullScaleBias, _material, CompositePass);
+			Blitter.BlitTexture(cmd, _lightTarget, flip ? FlippedScaleBias : FullScaleBias, _material, CompositePass);
 		}
 
 		partial void OnCreated() => _cameraDepthTextureKeyword = new LocalKeyword(_material.shader, CameraDepthTextureKeywordName);

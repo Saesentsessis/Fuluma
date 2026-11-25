@@ -21,10 +21,11 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	/// state set while a camera executes holds for its draws.
 	/// </summary>
 	/// <remarks>
-	/// Scene depth always comes from URP's <c>_CameraDepthTexture</c> (<see cref="NeedsCameraDepthTexture"/>): the
-	/// Compatibility path has no depth input attachment, and doesn't read the depth attachment as a texture. Every draw
-	/// uses the camera's own projection, and blits copy texel rows as they are, so the light buffer keeps the camera
-	/// target's orientation (render texture or backbuffer).
+	/// Full-resolution draws read scene depth from URP's <c>_CameraDepthTexture</c> (<see cref="NeedsCameraDepthTexture"/>;
+	/// no depth input attachment on this path); the light buffer reads the camera's depth attachment where it can be
+	/// sampled, else URP's depth texture (<see cref="DownsampledLightBuffer"/>). The light buffer is drawn with the camera's own projection; for a
+	/// camera rendering straight to the backbuffer (unflipped) the composite samples it upside down
+	/// (<see cref="CompositeLightBuffer"/>).
 	/// </remarks>
 	internal partial class FulumaSpotLightRenderPass
 	{
@@ -225,7 +226,8 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// </summary>
 		private void CompositeLightBuffer(CommandBuffer cmd, ref CameraData cameraData)
 		{
-			_lightBuffer.ExecuteComposite(cmd, cameraData.renderer.cameraColorTargetHandle);
+			var flip = SystemInfo.graphicsUVStartsAtTop && cameraData.IsCameraProjectionMatrixFlipped() == false;
+			_lightBuffer.ExecuteComposite(cmd, cameraData.renderer.cameraColorTargetHandle, flip);
 			BindCameraTargets(cmd, ref cameraData);
 		}
 

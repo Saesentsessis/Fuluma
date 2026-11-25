@@ -594,6 +594,10 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 #if UNITY_EDITOR && !UNITY_6000_0_OR_NEWER
 			if (s_scriptsLoaded == false)
 			{
+				// Shader references need no Burst, and a player build started right after loading (-executeMethod, before
+				// any delayCall) needs them to include the shaders.
+				AssignDefaultShaders();
+
 				// EditorApplication.delayCall runs once Unity has loaded scripts, Burst's initialization included.
 				UnityEditor.EditorApplication.delayCall += CreateAfterScriptsLoaded;
 				return;
