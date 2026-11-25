@@ -30,7 +30,8 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	/// is close.</item>
 	/// </list>
 	/// This file holds what doesn't depend on how URP runs the passes; <c>DownsampledLightBuffer.RenderGraph.cs</c>
-	/// records them into URP's render graph (Unity 6).
+	/// records them into URP's render graph (Unity 6), <c>DownsampledLightBuffer.Compatibility.cs</c> runs them from the
+	/// spot light pass's <c>Execute</c> (Unity 2022.3, and Compatibility Mode on 6.0-6.3).
 	/// </remarks>
 #if UNITY_6000_5_OR_NEWER
 	// Immutable: shader property IDs and constants.

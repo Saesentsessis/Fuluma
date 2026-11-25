@@ -72,6 +72,15 @@ namespace Saesentsessis.Fuluma.Editor.Build
 			KeywordValue.Of("_FULUMA_CHECKERBOARD", "Depth Aware")
 		});
 
+		/// <summary>
+		/// Where the light buffer's downsample and depth-aware composite read scene depth.
+		/// </summary>
+		public static readonly KeywordGroup LightBufferDepth = new("lightBufferDepth", "Light Buffer Scene Depth", new[]
+		{
+			KeywordValue.None("Given texture"),
+			KeywordValue.Of("_FULUMA_CAMERA_DEPTH_TEXTURE", "URP depth texture (Compatibility Mode)")
+		});
+
 		public static readonly ShaderKeywordSchema SpotLight = new("spotLight", SpotLightShaderName, "Spot Light Shader", new[]
 		{
 			DepthSource, NearPlaneFade, ClipClass, WideConePrecision, ScatteringPhase, DistanceFalloff, LampGlare
@@ -79,7 +88,7 @@ namespace Saesentsessis.Fuluma.Editor.Build
 
 		public static readonly ShaderKeywordSchema LightBuffer = new("lightBuffer", LightBufferShaderName, "Light Buffer Shader", new[]
 		{
-			Upsample
+			Upsample, LightBufferDepth
 		});
 
 		private static KeywordGroup OnOff(string id, string displayName, string keyword)
