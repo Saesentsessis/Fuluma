@@ -14,8 +14,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	/// downsampled light buffer.
 	/// </summary>
 	/// <remarks>
-	/// Add it to a Universal Renderer (RenderGraph only, no Compatibility Mode). Some property setters recreate the
-	/// feature's pass; each property says which.
+	/// Add it to a Universal Renderer. Some property setters recreate the feature's pass; each property says which.
 	/// </remarks>
 	public class FulumaRenderFeature : ScriptableRendererFeature
 	{
@@ -38,6 +37,16 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		private const float MinNearPlaneFadeDistance = 0.001f;
 		private const float DefaultScatteringAnisotropy = 0.7f;
 		private const float MaxScatteringAnisotropy = 0.95f;
+
+#if UNITY_EDITOR && !UNITY_6000_0_OR_NEWER
+		/// <summary>
+		/// Unity 2022.3 Editor: whether Unity has finished loading scripts since the last domain load. Before that, Burst's
+		/// Editor compiler isn't initialized, and the first call of a Burst function (building the proxy mesh through
+		/// MeshGen) crashes the Editor; URP creates its renderers, and so this feature, while Unity loads its assets at
+		/// startup. Set by the first deferred <see cref="Create"/>; a domain load resets it.
+		/// </summary>
+		private static bool s_scriptsLoaded;
+#endif
 
 		/// <summary>
 		/// <paramref name="value"/> clamped to [min, max], or <paramref name="fallback"/> when it isn't finite.
@@ -582,6 +591,15 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// </summary>
 		public override void Create()
 		{
+#if UNITY_EDITOR && !UNITY_6000_0_OR_NEWER
+			if (s_scriptsLoaded == false)
+			{
+				// EditorApplication.delayCall runs once Unity has loaded scripts, Burst's initialization included.
+				UnityEditor.EditorApplication.delayCall += CreateAfterScriptsLoaded;
+				return;
+			}
+#endif
+
 #if UNITY_EDITOR
 			AssignDefaultShaders();
 #endif
@@ -724,6 +742,22 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 #endif
 		
+#if UNITY_EDITOR && !UNITY_6000_0_OR_NEWER
+		/// <summary>
+		/// The <see cref="Create"/> a domain load deferred (Unity 2022.3 Editor; see <see cref="s_scriptsLoaded"/>).
+		/// </summary>
+		private void CreateAfterScriptsLoaded()
+		{
+			s_scriptsLoaded = true;
+
+			// Destroyed, or already created by a later call.
+			if (this == null || _spotLightRenderPass != null)
+				return;
+
+			Create();
+		}
+#endif
+
 		/// <summary>
 		/// Disposes a pass <see cref="Create"/> replaced. Inside <see cref="OnValidate"/> (every Inspector edit) the pass's
 		/// proxy mesh and materials can't be destroyed, so there the disposal waits for the next Editor update.

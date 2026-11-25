@@ -26,7 +26,8 @@ The old path is called the **compatibility path** below, whichever Unity version
 | 1. Groundwork (partials, shared draw loop, packed prepass camera state, compile switches) | Done, `f190b6b` |
 | 2. RenderGraph on 6.0–6.2 (API gates, package minimums) | Done, `f190b6b` |
 | 3. Compatibility path, full resolution | Done, `7d682f6` |
-| Audit fixes, 6.3 define support | In progress |
+| Review fixes, 6.3 define support | Done, `7c6a4bf` |
+| 2022.3 Editor startup crash (Burst) | Fixed |
 | 4. Compatibility path, light buffer | Next |
 | 5. Compatibility path, early pass | |
 | 6. Test projects, dual-path fixtures, parity test, CI | |
@@ -185,9 +186,16 @@ switching targets inside `Execute` is legal; the cost is that Fuluma always brea
   in them (CI covers CPU tests only); worth fixing now that there are two paths.
 - `release.yml`: `INSTALLER_UNITY_VERSION` 2022.3.62f3, Installer project migrated down (as done for ShaderWorks).
 - The dev project stays on 6000.7, where the compatibility path isn't compiled at all. Scratch projects at short paths
-  (`%TEMP%/claude/s22`, `s60`) carry an embedded copy of the package, refreshed before each run: opened by `file:` path,
-  2022.3 rewrote the repository's guid-only `.meta` files into full importer blocks, and a long project path broke
-  Burst and the package cache (260-character limit).
+  (`%TEMP%/claude/s22`, `s60`, `s63`) carry an embedded copy of the package, refreshed before each run: opened by
+  `file:` path, 2022.3 rewrote the repository's guid-only `.meta` files into full importer blocks, and a long project
+  path broke the package cache (260-character limit).
+- **Editor startup on 2022.3** (fixed): when Unity loads a project whose scripts are already compiled, URP creates its
+  renderers, and so Fuluma's feature, while assets load, before Burst's Editor compiler is initialized; the first call
+  of a Burst function (MeshGen, building the proxy mesh) crashed the Editor (`BurstCompilerService::CompileAsync`).
+  Confirmed by running with `--burst-disable-compilation` (no crash); 6000.0 doesn't crash. In the 2022.3 Editor the
+  feature's first `Create` after a domain load now waits for `EditorApplication.delayCall` (user's choice). Not
+  checked: a scene with fake light components open at startup (their registration calls Burst `PackingKernels`); in
+  batch mode Unity doesn't restore the last scene, so it needs a check in the Editor.
 - Docs: README Requirements, Platform Support and Upcoming Changes; `Documentation~/FulumaRenderFeature.md` ("RenderGraph
   only"); CHANGELOG; the project's CLAUDE.md.
 
@@ -238,3 +246,5 @@ switching targets inside `Execute` is legal; the cost is that Fuluma always brea
     material, mode cached per pass, DontCare loads, depth-only cameras skipped, member order and doc corrections, the
     6000.0 suite in both modes before phase 4. `_earlyDepthIsAttachment` stays shared: the compatibility early pass
     uses it too.
+12. **2022.3 Editor startup crash:** defer the feature's first `Create` to `EditorApplication.delayCall` (2022.3 Editor
+    only; Unity 6 and players unchanged).
