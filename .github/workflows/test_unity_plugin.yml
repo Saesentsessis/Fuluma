@@ -97,7 +97,7 @@ jobs:
       # Pinned: v4.4.0 (what @v4 points to) looks up the newest game-ci/cli through an unauthenticated GitHub API
       # call that fails with 403 under the shared rate limit. Fixed by game-ci/unity-test-runner#332, unreleased
       # as of 2026-11-24: move to the first 4.4.x that includes it.
-      - uses: game-ci/unity-test-runner@v4.3.2
+      - uses: game-ci/unity-test-runner@v4.4.0
         id: tests
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
