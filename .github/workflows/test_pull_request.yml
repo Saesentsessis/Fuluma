@@ -16,6 +16,11 @@ jobs:
       fail-fast: false
       matrix:
         config:
+          # The minimum (Compatibility path), the Unity 6 RenderGraph floor, and the current versions.
+          - unityVersion: "2022.3.62f3"
+            projectPath: "./Unity-Tests/2022.3.62f3"
+          - unityVersion: "6000.0.85f2"
+            projectPath: "./Unity-Tests/6000.0.85f2"
           - unityVersion: "6000.3.1f1"
             projectPath: "./Unity-Tests/6000.3.1f1"
           - unityVersion: "6000.6.1f1"

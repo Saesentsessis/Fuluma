@@ -28,24 +28,25 @@ The old path is called the **compatibility path** below, whichever Unity version
 | 3. Compatibility path, full resolution | Done, `7d682f6` |
 | Review fixes, 6.3 define support | Done, `7c6a4bf` |
 | 2022.3 Editor startup crash (Burst) | Fixed |
-| 4. Compatibility path, light buffer | Next |
-| 5. Compatibility path, early pass | |
-| 6. Test projects, dual-path fixtures, parity test, CI | |
+| 4. Compatibility path, light buffer | Done, `91d8f32` |
+| 5. Compatibility path, early pass | Done, `5c65f17` |
+| 6. Test projects (URP asset with the feature in all four), CI matrix | Done |
 | 7. Release 0.2.0: installer, docs, CHANGELOG | |
 | Profiling project on 2022.3 (git-ignored), players, phone measurements | After the suite passes on 2022.3 and 6000.0 |
 
-EditMode suite (304 tests, 36 skipped by design: benchmarks, GPU-less cases):
+EditMode suite (304 tests, 36 skipped by design: benchmarks, GPU-less cases), after phase 5:
 
 | Editor / mode | Passed | Failed |
 |---|---|---|
 | 6000.7.0b4 (dev project), RenderGraph | 268 | 0 |
+| 6000.3.0f1 (`Unity-Tests/6000.3.1f1`), RenderGraph | 268 | 0 |
 | 6000.0.85f2, RenderGraph | 268 | 0 |
-| 6000.0.85f2, Compatibility Mode | 256 | 12 |
-| 2022.3.62f3 | 256 | 12 |
+| 6000.0.85f2, Compatibility Mode | 268 | 0 |
+| 2022.3.62f3 | 268 | 0 |
 
-The 12 failures are the light buffer, LargeOnly, BeforeOpaques and Auto timing tests (phases 4 and 5); every
-full-resolution render test and brute-force integral comparison passes on the compatibility path. Compiles without
-Fuluma errors or warnings on 6000.7.0b4, 6000.3.0f1, 6000.0.85f2 and 2022.3.62f3.
+Both paths on 6.0–6.3 are covered by running the suite once per mode (decision 13). Compiles without Fuluma errors or
+warnings on 6000.7.0b4, 6000.3.0f1 (also with `URP_COMPATIBILITY_MODE`), 6000.0.85f2, 2022.3.62f3 and 2022.3.20f1
+(which resolves URP 14.0.10, Burst 1.8.25, Collections 2.6.2, Mathematics 1.3.3).
 
 ## Compatibility Mode by version
 
@@ -248,3 +249,7 @@ switching targets inside `Execute` is legal; the cost is that Fuluma always brea
     uses it too.
 12. **2022.3 Editor startup crash:** defer the feature's first `Create` to `EditorApplication.delayCall` (2022.3 Editor
     only; Unity 6 and players unchanged).
+13. **Test coverage:** all four `Unity-Tests` projects get a URP asset whose renderer has the feature (render tests run
+    wherever there is a GPU; CI runners have none, so they skip there); on 6.0–6.3 the suite runs once per mode, no
+    in-suite parity test; CI matrix 2022.3.62f3, 6000.0.85f2, 6000.3.1f1, 6000.6.1f1; the profiling project lives
+    outside the repository.
