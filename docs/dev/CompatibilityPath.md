@@ -31,6 +31,7 @@ The old path is called the **compatibility path** below, whichever Unity version
 | 4. Compatibility path, light buffer | Done, `91d8f32` |
 | 5. Compatibility path, early pass | Done, `5c65f17` |
 | 6. Test projects (URP asset with the feature in all four), CI matrix | Done |
+| Composite merge experiment (RenderGraph) | Kept on branch `dev/urp_compatibility_mode_composite_merge` (`5ba5116`), not merged (user's choice): it removes RenderGraph's extra LargeOnly reload but not its cost; see "Cost on phones" |
 | 7. Release 0.2.0: installer, docs, CHANGELOG | |
 | Profiling project on 2022.3 (git-ignored), players, phone measurements | After the suite passes on 2022.3 and 6000.0 |
 
@@ -91,9 +92,19 @@ player per mode) and the dev project (6000.7.0b4). No throttling (thermal status
   LargeOnly both make the copy (the small full-resolution lights read it).
   - In a scene with transparent objects both paths begin that pass, so the difference shows only when the
     transparents pass is empty.
-  - Possible fix (not done): when URP makes `_CameraDepthTexture` anyway (LargeOnly without depth input attachment,
-    MSAA), the depth-aware composite could read that copy and keep the depth attachment attached read-only, like the
-    bilinear composite, so it merges with the transparents pass on every path.
+  - Tried on branch `dev/urp_compatibility_mode_composite_merge` (`5ba5116`, not merged): where URP makes
+    `_CameraDepthTexture` anyway (MSAA, LargeOnly without depth input attachment) the downsample and the depth-aware
+    composite read the copy, and the composite keeps the camera's depth attached read-only. RenderGraph can't merge a
+    pass into one that sampled its target (`PassBreakReason.NextPassTargetsTexture` in Core 17.0), so this lets it
+    merge. RenderDoc (6000.0 Vulkan): transparents then follow the composite as `vkCmdNextSubpass`, and an extra empty
+    raster pass from another feature before them (`-fulumaExtraPass` in `Fuluma6000`) joins that subpass too. Suite
+    268/0 on 2022.3, 6000.0 (both modes), 6000.7. Phones, both players rebuilt from the same state, two rounds:
+    LargeOnly pixels now match Compatibility (11T 19.62 M -> 17.02 M vs 17.0 M; 15C 8.89 M -> 7.72 M vs 7.7 M), GPU
+    cycles unchanged (11T 10.40 M -> 10.39 M; 15C 47.72 M -> 47.84 M): the reload is cheap on Mali. Not merged because
+    of that and its trade-off: depth written after URP's copy (another feature's geometry between the copy and Fuluma's
+    pass) no longer reaches the light buffer.
+  - What does cost RenderGraph 1.5-4% (11T) remains open: 2.6-5.3 M more fragment threads than Compatibility in every
+    configuration, with the same pixels written after the experiment.
 - RenderGraph runs 2-5 M more fragment threads than Compatibility in 6000.0; apart from LargeOnly, at no measurable
   cost.
 - The overlay's per-pass GPU timers (`ProfilingScope`) disagree with the counters on these tile GPUs (the same frame
