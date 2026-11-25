@@ -714,9 +714,6 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 #endif
 		
 		/// <summary>
-		/// The URP renderer data this feature belongs to, among every configured pipeline asset (null if none lists it).
-		/// </summary>
-		/// <summary>
 		/// Disposes a pass <see cref="Create"/> replaced. Inside <see cref="OnValidate"/> (every Inspector edit) the pass's
 		/// proxy mesh and materials can't be destroyed, so there the disposal waits for the next Editor update.
 		/// </summary>
@@ -775,8 +772,12 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 				lightBufferTiming = LightBufferTiming.Auto;
 		}
 
+		/// <summary>
+		/// The URP renderer data this feature belongs to, among every configured pipeline asset (null if none lists it).
+		/// </summary>
 		private UniversalRendererData FindRendererData()
 		{
+#if UNITY_6000_0_OR_NEWER
 			foreach (var pipeline in GraphicsSettings.allConfiguredRenderPipelines)
 			{
 				if (pipeline is not UniversalRenderPipelineAsset asset)
@@ -786,6 +787,12 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 					if (rendererData is UniversalRendererData universal && universal.rendererFeatures.Contains(this))
 						return universal;
 			}
+#else
+			// URP 14 has no public renderer list. A feature is a sub-asset of its renderer data, which is loaded with it.
+			foreach (var universal in Resources.FindObjectsOfTypeAll<UniversalRendererData>())
+				if (universal.rendererFeatures.Contains(this))
+					return universal;
+#endif
 
 			return null;
 		}

@@ -19,8 +19,9 @@ namespace Saesentsessis.Fuluma.Editor.Components
 	/// level (a level without its own pipeline asset uses the default one).
 	/// </summary>
 	/// <remarks>
-	/// Reads URP's public renderer list and each renderer's feature list; no reflection. Stores are compared by the
-	/// serialized override store (null = <see cref="LightStore.Default"/>), so the lookup never creates the default store.
+	/// Reads URP's public renderer list (URP 14 has none, so there the pipeline asset's serialized list) and each
+	/// renderer's feature list; no reflection. Stores are compared by the serialized override store (null =
+	/// <see cref="LightStore.Default"/>), so the lookup never creates the default store.
 	/// </remarks>
 	internal static class StoreFeatureLookup
 	{
@@ -76,7 +77,7 @@ namespace Saesentsessis.Fuluma.Editor.Components
 			{
 				result.AnyUniversalPipeline = true;
 
-				foreach (var renderer in universal.rendererDataList)
+				foreach (var renderer in RendererDataList(universal))
 				{
 					if (renderer != null)
 						draws |= ScanRenderer(renderer, overrideStore, result);
@@ -86,6 +87,25 @@ namespace Saesentsessis.Fuluma.Editor.Components
 			ScannedAssets.Add((asset, draws));
 			return draws;
 		}
+
+#if UNITY_6000_0_OR_NEWER
+		private static System.ReadOnlySpan<ScriptableRendererData> RendererDataList(UniversalRenderPipelineAsset asset)
+			=> asset.rendererDataList;
+#else
+		/// <summary>
+		/// URP 14 keeps the renderer list in a serialized field only.
+		/// </summary>
+		private static IEnumerable<ScriptableRendererData> RendererDataList(UniversalRenderPipelineAsset asset)
+		{
+			using var serialized = new UnityEditor.SerializedObject(asset);
+			var list = serialized.FindProperty("m_RendererDataList");
+			if (list == null || list.isArray == false)
+				yield break;
+
+			for (var i = 0; i < list.arraySize; i++)
+				yield return list.GetArrayElementAtIndex(i).objectReferenceValue as ScriptableRendererData;
+		}
+#endif
 
 		private static bool ScanRenderer(ScriptableRendererData renderer, LightStore overrideStore, Result result)
 		{

@@ -9,7 +9,6 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 #if UNITY_6000_5_OR_NEWER
 using Unity.Scripting.LifecycleManagement;
@@ -43,12 +42,16 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	/// others drawing at full resolution first. The buffer's depth is made from the camera's depth attachment, or from
 	/// URP's depth texture with MSAA.
 	/// </para>
+	/// <para>
+	/// This file holds what doesn't depend on how URP runs the pass: settings, materials, culling and the draw loop.
+	/// <c>FulumaSpotLightRenderPass.RenderGraph.cs</c> records it into URP's render graph (Unity 6).
+	/// </para>
 	/// </remarks>
 #if UNITY_6000_5_OR_NEWER
 	// Immutable: shader property IDs.
 	[NoAutoStaticsCleanup]
 #endif
-	internal class FulumaSpotLightRenderPass : ScriptableRenderPass, IDisposable
+	internal partial class FulumaSpotLightRenderPass : ScriptableRenderPass, IDisposable
 	{
 		/// <summary>
 		/// Default of <see cref="MaxVisibleLights"/>.
@@ -138,12 +141,18 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 #endif
 
 		/// <summary>
-		/// Full-resolution depth the light buffer's downsample and depth-aware composite read: the camera's depth attachment
-		/// itself when it is single-sampled (URP then needn't copy it into <c>_CameraDepthTexture</c>, a whole-screen pass
-		/// plus a depth store and reload on tile-based GPUs), else URP's resolved copy.
+		/// Whether URP runs passes through <c>Execute</c> (Compatibility Mode) instead of the render graph: always on
+		/// Unity 2022.3 (URP 14), the Graphics settings' checkbox on 6.0-6.2, never from 6.3.
 		/// </summary>
-		private static TextureHandle LightBufferDepthSource(UniversalResourceData resources, int msaaSamples)
-			=> msaaSamples <= 1 ? resources.activeDepthTexture : resources.cameraDepthTexture;
+		internal static bool CompatibilityModeActive
+#if UNITY_6000_3_OR_NEWER
+			=> false;
+#elif UNITY_6000_0_OR_NEWER
+			=> GraphicsSettings.TryGetRenderPipelineSettings<RenderGraphSettings>(out var settings)
+			   && settings.enableRenderCompatibilityMode;
+#else
+			=> true;
+#endif
 
 		/// <summary>
 		/// <c>_FulumaPhase</c>: (a, b, m) of Henyey-Greenstein's phase function relative to isotropic scattering, which the
@@ -156,7 +165,12 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			return new Vector4(1f - g * g, 1f + g * g, 2f * g, 0f);
 		}
 
-		private static void ExecutePass(RasterPassData data, RasterGraphContext context)
+		/// <summary>
+		/// One light pass's draws, when it executes, through whichever command buffer URP gives it.
+		/// </summary>
+		/// <param name="lowResDepth">Downsampled buffer only: the low-resolution depth the shader reads; else null.</param>
+		private static void ExecuteDraws<TCommands>(TCommands cmd, DrawPassData data, Texture lowResDepth)
+			where TCommands : struct, IDrawCommands
 		{
 			// The dynamic transform buffer is locked until its copy job finishes; unlock before the GPU reads it.
 			data.Mirror.CompleteUploads();
@@ -171,23 +185,20 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			// values set here hold for this pass's draws.
 			var properties = data.Properties;
 			properties.SetBuffer(VisibleLightsId, culler.Buffer);
-			if (data.LowResDepth.IsValid())
-			{
-				RTHandle lowResDepth = data.LowResDepth;
+			if (lowResDepth != null)
 				properties.SetTexture(LowResDepthId, lowResDepth);
-			}
 
-			DrawPool(context.cmd, data, culler, LightTransformMode.Static, properties);
-			DrawPool(context.cmd, data, culler, LightTransformMode.Dynamic, properties);
+			DrawPool(cmd, data, culler, LightTransformMode.Static, properties);
+			DrawPool(cmd, data, culler, LightTransformMode.Dynamic, properties);
 		}
 
 		/// <summary>
-		/// The draws of <see cref="RasterPassData.DrawSet"/>: all lights; the small outside ones (full resolution next to
+		/// The draws of <see cref="DrawPassData.DrawSet"/>: all lights; the small outside ones (full resolution next to
 		/// the downsampled buffer); or the inside and large outside ones (the downsampled buffer). Without a large-light
 		/// split, <see cref="SpotLightCuller.LargeDraw"/> is empty and the small outside draws hold every outside light.
 		/// </summary>
-		private static void DrawPool(RasterCommandBuffer cmd, RasterPassData data, SpotLightCuller culler, LightTransformMode pool,
-			MaterialPropertyBlock properties)
+		private static void DrawPool<TCommands>(TCommands cmd, DrawPassData data, SpotLightCuller culler, LightTransformMode pool,
+			MaterialPropertyBlock properties) where TCommands : struct, IDrawCommands
 		{
 			var small = data.DrawSet != DrawSet.Large;
 			var large = data.DrawSet != DrawSet.Small;
@@ -220,8 +231,9 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// they use, and the general variant's registers don't slow the others. Without clip boxes the whole region is
 		/// class 0. A region lists its classes in order (<paramref name="clipClasses"/>; the rest of the region is general).
 		/// </summary>
-		private static void Draw(RasterCommandBuffer cmd, RasterPassData data, Material material, int clipClass, int shaderPass,
+		private static void Draw<TCommands>(TCommands cmd, DrawPassData data, Material material, int clipClass, int shaderPass,
 			int lod, MaterialPropertyBlock properties, RangeInt lightsRange, SpotLightClipClassCounts clipClasses)
+			where TCommands : struct, IDrawCommands
 		{
 			if (lightsRange.length == 0 || material == null)
 				return;
@@ -249,8 +261,8 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			DrawLights(cmd, data, material, shaderPass, lod, properties, start, count);
 		}
 
-		private static void DrawLights(RasterCommandBuffer cmd, RasterPassData data, Material material, int shaderPass,
-			int lod, MaterialPropertyBlock properties, int start, int count)
+		private static void DrawLights<TCommands>(TCommands cmd, DrawPassData data, Material material, int shaderPass,
+			int lod, MaterialPropertyBlock properties, int start, int count) where TCommands : struct, IDrawCommands
 		{
 			if (count <= 0)
 				return;
@@ -409,13 +421,11 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// The camera whose light buffer the early pass recorded this frame, and the buffer's targets for the composite.
 		/// </summary>
 		private Camera _earlyCamera;
-		private DownsampledLightBuffer.Targets _earlyTargets;
 
 		/// <summary>
-		/// The depth the early pass downsampled (the prepass texture, or the primed depth attachment), which the
-		/// depth-aware composite reads too, and whether it is the attachment.
+		/// Whether the depth the early pass downsampled is the camera's (primed) depth attachment rather than the prepass
+		/// depth texture.
 		/// </summary>
-		private TextureHandle _earlyDepth;
 		private bool _earlyDepthIsAttachment;
 
 		/// <summary>
@@ -756,74 +766,6 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 
 		/// <summary>
-		/// Records this camera's light draws: at full resolution, through the downsampled light buffer, or both (Large
-		/// Only); only the composite when the early pass already drew the buffer. Records nothing when the store is
-		/// empty or there is no scene depth to read.
-		/// </summary>
-		public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
-		{
-			var resources = frameData.Get<UniversalResourceData>();
-			var cameraData = frameData.Get<UniversalCameraData>();
-			var camera = cameraData.camera;
-
-			// What the early pass (LightBufferTiming) already did for this camera, if anything.
-			var prepared = _preparedCamera == camera;
-			var early = prepared && _earlyCamera == camera;
-			_preparedCamera = null;
-			_earlyCamera = null;
-
-			if (TryPrepareCamera(renderGraph, resources, cameraData, prepared, out var msaaSamples) == false)
-				return;
-
-			LastRecordedLowResolutionPasses = false;
-			LastRecordedLightBufferBeforeOpaques = early;
-
-			if (_lightBuffer == null)
-			{
-				RecordFullResolutionPass(renderGraph, resources, msaaSamples, camera, DrawSet.All);
-				return;
-			}
-
-			if (early)
-			{
-				// The buffer is drawn already; small lights (LargeOnly) at full resolution, then the composite. It reads the
-				// prepass depth texture, so the camera's depth stays attached (read-only) and the composite merges into
-				// URP's opaque native render pass.
-				if (SplitsLargeLights)
-				{
-					RecordFullResolutionPass(renderGraph, resources, msaaSamples, camera, DrawSet.Small);
-					LastRecordedLowResolutionPasses = true;
-				}
-
-				// The depth-aware composite samples the downsampled depth's source; the camera's depth attachment stays
-				// attached unless that is it (primed depth).
-				var keepDepthAttached = _earlyDepthIsAttachment == false || _lightBuffer.Upsample == LightBufferUpsample.Bilinear;
-				_lightBuffer.RecordComposite(renderGraph, _earlyTargets, resources.activeColorTexture, _earlyDepth,
-					keepDepthAttached ? resources.activeDepthTexture : TextureHandle.nullHandle);
-				return;
-			}
-
-			if (SplitsLargeLights == false)
-			{
-				RecordLowResolutionPasses(renderGraph, resources, cameraData, msaaSamples, DrawSet.All, FulumaProfiling.DrawName,
-					FulumaProfiling.DrawSampler);
-				return;
-			}
-
-			// LargeOnly: small lights at full resolution; large and camera-inside lights through the downsampled buffer,
-			// unless the last culling of this camera found none (then the full-resolution pass draws everything).
-			var lowResolution = (_useSceneDepth == false || LightBufferDepthSource(resources, msaaSamples).IsValid())
-			                    && LowResolutionLightsLastFrame(camera);
-			LastRecordedLowResolutionPasses = lowResolution;
-
-			RecordFullResolutionPass(renderGraph, resources, msaaSamples, camera, lowResolution ? DrawSet.Small : DrawSet.All);
-
-			if (lowResolution)
-				RecordLowResolutionPasses(renderGraph, resources, cameraData, msaaSamples, DrawSet.Large, FulumaProfiling.DrawLowResolutionName,
-					FulumaProfiling.DrawLowResolutionSampler);
-		}
-
-		/// <summary>
 		/// Releases the culler, the light buffer, the materials and the proxy mesh, and this pass's hold on the store's
 		/// GPU mirror (freed when no pass uses it any more).
 		/// </summary>
@@ -884,44 +826,9 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 
 		/// <summary>
-		/// <see cref="LightBufferTiming"/> before the opaques: records the light buffer's downsample and low-resolution draw
-		/// from URP's depth prepass, right after the prepasses (called by <see cref="FulumaLightBufferEarlyPass"/>). The main
-		/// pass then composites it. Without a prepass (Auto, and URP renders none) nothing is recorded here and the main pass
-		/// does everything after the opaques.
-		/// </summary>
-		internal void RecordLightBufferBeforeOpaques(RenderGraph renderGraph, ContextContainer frameData)
-		{
-			var resources = frameData.Get<UniversalResourceData>();
-			var cameraData = frameData.Get<UniversalCameraData>();
-			var camera = cameraData.camera;
-
-			_preparedCamera = null;
-			_earlyCamera = null;
-
-			if (_lightBuffer == null || TryPrepareCamera(renderGraph, resources, cameraData, false, out _) == false)
-				return;
-
-			_preparedCamera = camera;
-
-			if (TryGetPrepassDepth(resources, cameraData, out var prepassDepth, out var isAttachment) == false)
-				return;
-
-			if (SplitsLargeLights && LowResolutionLightsLastFrame(camera) == false)
-				return;
-
-			_earlyTargets = RecordLowResolutionDraw(renderGraph, resources, cameraData, prepassDepth,
-				SplitsLargeLights ? DrawSet.Large : DrawSet.All,
-				SplitsLargeLights ? FulumaProfiling.DrawLowResolutionName : FulumaProfiling.DrawName,
-				SplitsLargeLights ? FulumaProfiling.DrawLowResolutionSampler : FulumaProfiling.DrawSampler);
-			_earlyDepth = prepassDepth;
-			_earlyDepthIsAttachment = isAttachment;
-			_earlyCamera = camera;
-		}
-
-		/// <summary>
 		/// Per camera, before URP sets up its passes (the feature's <c>AddRenderPasses</c>). Depth as input attachment:
 		/// read-only depth from tile memory. The downsampled buffer reads the depth attachment as a texture (see
-		/// <see cref="LightBufferDepthSource"/>). Both need an intermediate target, since the backbuffer's depth can't be
+		/// <c>LightBufferDepthSource</c>). Both need an intermediate target, since the backbuffer's depth can't be
 		/// read; the composite also blends into an intermediate color target. URP's depth texture only where
 		/// <see cref="NeedsCameraDepthTexture"/>.
 		/// </summary>
@@ -929,151 +836,67 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		internal void ConfigureDepthSource(int msaaSamples)
 		{
 			ConfigureInput(NeedsCameraDepthTexture(msaaSamples) ? ScriptableRenderPassInput.Depth : ScriptableRenderPassInput.None);
+#if UNITY_6000_0_OR_NEWER
 			requiresIntermediateTexture = _depthAsInputAttachment || _lightBuffer != null;
-		}
-
-		/// <summary>
-		/// Where URP's depth prepass put this camera's depth, if it renders one: with Auto, a prepass the renderer's settings
-		/// cause anyway (<see cref="UrpDepthPrepass"/>; the depth attachment with depth priming, else
-		/// <c>_CameraDepthTexture</c>), or,
-		/// with <see cref="URP.LightBufferTiming.BeforeOpaques"/>, the one the early pass requested (in
-		/// <c>_CameraDepthTexture</c>, which URP fills right after the prepass even with depth priming).
-		/// </summary>
-		private bool TryGetPrepassDepth(UniversalResourceData resources, UniversalCameraData cameraData, out TextureHandle depth,
-			out bool isAttachment)
-		{
-			// Before Opaques asks URP for the depth texture itself (the early pass's input), so URP may then also need to
-			// copy depth, which depth priming depends on.
-			var forced = _lightBufferTiming == LightBufferTiming.BeforeOpaques;
-			var passNeedsDepthTexture = forced || (input & ScriptableRenderPassInput.Depth) != 0;
-			if (UrpDepthPrepass.TryGetPrepassDepth(RendererData, cameraData, resources, passNeedsDepthTexture, out depth,
-				    out isAttachment))
-				return true;
-
-			isAttachment = false;
-			depth = forced ? resources.cameraDepthTexture : TextureHandle.nullHandle;
-			return depth.IsValid();
-		}
-
-		/// <summary>
-		/// Once per camera and frame, by whichever pass records first: consumes the culling started for it (or starts
-		/// it), sets the depth keywords and binds the mirror's buffers.
-		/// </summary>
-		/// <param name="alreadyPrepared">The early pass prepared this camera: only returns its MSAA sample count.</param>
-		/// <returns>False when nothing is drawn for this camera.</returns>
-		private bool TryPrepareCamera(RenderGraph renderGraph, UniversalResourceData resources, UniversalCameraData cameraData,
-			bool alreadyPrepared, out int msaaSamples)
-		{
-			msaaSamples = _preparedMsaaSamples;
-			if (alreadyPrepared)
-				return true;
-
-			// Consumed here whatever happens next, so an early return can't leave it to a later recording.
-			var culledCamera = _cullingCamera;
-			_cullingCamera = null;
-
-			if (IsCreated == false || _mirror.StaticCount + _mirror.DynamicCount == 0)
-				return false;
-
-			if (resources.activeColorTexture.IsValid() == false || resources.activeDepthTexture.IsValid() == false)
-				return false;
-
-			if (TryGetMsaaSamples(renderGraph, resources, cameraData, out msaaSamples) == false)
-				return false;
-
-			SetDepthKeywords(msaaSamples);
-			_clipBoxesActive = _clipBoxesEnabled && _mirror.ClipBoxesActive;
-			EnsureCullingStarted(cameraData, culledCamera);
-			BindMaterials(msaaSamples);
-			_preparedMsaaSamples = msaaSamples;
-			return true;
-		}
-
-		private void RecordFullResolutionPass(RenderGraph renderGraph, UniversalResourceData resources, int msaaSamples,
-			Camera camera, DrawSet drawSet)
-		{
-			using var builder = renderGraph.AddRasterRenderPass(FulumaProfiling.DrawName, out RasterPassData data,
-				FulumaProfiling.DrawSampler);
-
-			builder.SetRenderAttachment(resources.activeColorTexture, 0);
-			BindSceneDepth(builder, resources);
-			builder.AllowGlobalStateModification(false);
-
-			FillPassData(data, lowResolution: false, camera, drawSet, TextureHandle.nullHandle);
-			builder.SetRenderFunc(static (RasterPassData pData, RasterGraphContext context) => ExecutePass(pData, context));
-		}
-
-		/// <summary>
-		/// Low-resolution depth, the lights of <paramref name="drawSet"/> into the low-resolution buffer, then the buffer
-		/// onto the camera color.
-		/// </summary>
-		private void RecordLowResolutionPasses(RenderGraph renderGraph, UniversalResourceData resources,
-			UniversalCameraData cameraData, int msaaSamples, DrawSet drawSet, string drawName, ProfilingSampler drawSampler)
-		{
-			var sceneDepth = _useSceneDepth ? LightBufferDepthSource(resources, msaaSamples) : TextureHandle.nullHandle;
-			var targets = RecordLowResolutionDraw(renderGraph, resources, cameraData, sceneDepth, drawSet, drawName, drawSampler);
-
-			// The bilinear composite keeps the camera's depth attached (read-only, unused) so it merges into the following
-			// passes; the depth-aware one samples it as a texture, so it can't.
-			var keepDepthAttached = _lightBuffer.Upsample == LightBufferUpsample.Bilinear && msaaSamples <= 1;
-			_lightBuffer.RecordComposite(renderGraph, targets, resources.activeColorTexture, sceneDepth,
-				keepDepthAttached ? resources.activeDepthTexture : TextureHandle.nullHandle);
-		}
-
-		/// <summary>
-		/// Low-resolution depth from <paramref name="sceneDepth"/> (none when the lights don't use scene depth), then the
-		/// lights of <paramref name="drawSet"/> into the low-resolution buffer.
-		/// </summary>
-		private DownsampledLightBuffer.Targets RecordLowResolutionDraw(RenderGraph renderGraph, UniversalResourceData resources,
-			UniversalCameraData cameraData, TextureHandle sceneDepth, DrawSet drawSet, string drawName, ProfilingSampler drawSampler)
-		{
-			// The buffer is sized from the texture it is composited onto. URP's camera color has an explicit size; a color
-			// target sized by scale (another feature's) reports none, so the camera's target size stands in.
-			var cameraColor = renderGraph.GetTextureDesc(resources.activeColorTexture);
-			int width, height;
-			if (cameraColor.sizeMode == TextureSizeMode.Explicit)
-			{
-				width = cameraColor.width;
-				height = cameraColor.height;
-			}
-			else
-			{
-				width = cameraData.cameraTargetDescriptor.width;
-				height = cameraData.cameraTargetDescriptor.height;
-			}
-
-			var targets = _useSceneDepth
-				? _lightBuffer.RecordDownsample(renderGraph, sceneDepth, cameraColor, width, height)
-				: _lightBuffer.CreateLightTarget(renderGraph, cameraColor, width, height);
-
-			using var builder = renderGraph.AddRasterRenderPass(drawName, out RasterPassData data, drawSampler);
-			builder.SetRenderAttachment(targets.Light, 0);
-			if (_useSceneDepth)
-			{
-				builder.SetRenderAttachmentDepth(targets.Depth, AccessFlags.Read);
-				builder.UseTexture(targets.RawDepth);
-			}
-
-			builder.AllowGlobalStateModification(false);
-
-			FillPassData(data, lowResolution: true, cameraData.camera, drawSet, targets.RawDepth);
-			builder.SetRenderFunc(static (RasterPassData pData, RasterGraphContext context) => ExecutePass(pData, context));
-			return targets;
+#endif
 		}
 
 		/// <summary>
 		/// Whether this camera's draws need URP's <c>_CameraDepthTexture</c>: full-resolution draws without depth input
-		/// attachments, and the light buffer with MSAA (its passes read single samples).
+		/// attachments, the light buffer with MSAA (its passes read single samples), and every draw in Compatibility Mode.
 		/// </summary>
 		private bool NeedsCameraDepthTexture(int msaaSamples)
 			=> _useSceneDepth
-			   && ((_depthAsInputAttachment == false && (_lightBuffer == null || SplitsLargeLights))
+			   && (CompatibilityModeActive
+			       || (_depthAsInputAttachment == false && (_lightBuffer == null || SplitsLargeLights))
 			       || (_lightBuffer != null && msaaSamples > 1));
 
-		private void FillPassData(RasterPassData data, bool lowResolution, Camera camera, DrawSet drawSet,
-			TextureHandle lowResDepth)
+		/// <summary>
+		/// Starts preparing a camera, by whichever pass records it first: takes the camera whose culling
+		/// <see cref="BeginCulling"/> started (consumed whatever happens next, so an early return can't leave it to a
+		/// later recording).
+		/// </summary>
+		/// <returns>False when there is nothing to draw.</returns>
+		private bool TryBeginPreparingCamera(out Camera culledCamera)
 		{
-			data.LowResDepth = lowResDepth;
+			culledCamera = _cullingCamera;
+			_cullingCamera = null;
+			return IsCreated && _mirror.StaticCount + _mirror.DynamicCount > 0;
+		}
+
+		/// <summary>
+		/// Finishes preparing a camera once its MSAA sample count is known: depth keywords, the clip box variant, its
+		/// culling (scheduled now if <see cref="BeginCulling"/> didn't run for it) and the materials' buffers.
+		/// </summary>
+		private void FinishPreparingCamera(int msaaSamples, Camera camera, Camera culledCamera, Matrix4x4 view,
+			Matrix4x4 projection, Vector3 position)
+		{
+			SetDepthKeywords(msaaSamples);
+			_clipBoxesActive = _clipBoxesEnabled && _mirror.ClipBoxesActive;
+			EnsureCullingStarted(camera, culledCamera, view, projection, position);
+			BindMaterials(msaaSamples);
+			_preparedMsaaSamples = msaaSamples;
+		}
+
+		/// <summary>
+		/// False, warned once, when this camera's draws need URP's <c>_CameraDepthTexture</c> and URP has none.
+		/// </summary>
+		private bool HasNeededDepthTexture(int msaaSamples, bool cameraDepthTextureExists)
+		{
+			if (NeedsCameraDepthTexture(msaaSamples) == false || cameraDepthTextureExists)
+				return true;
+
+			if (_warnedMissingDepth == false)
+			{
+				Debug.LogWarning(StringUtils.PrependFulumaPrefix(MissingDepthTextureMessage));
+				_warnedMissingDepth = true;
+			}
+
+			return false;
+		}
+
+		private void FillPassData(DrawPassData data, bool lowResolution, Camera camera, DrawSet drawSet)
+		{
 			data.Mirror = _mirror;
 			data.Mesh = _proxyMesh;
 			data.LodShapes = _lodShapes;
@@ -1185,38 +1008,13 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// CPU culling for this camera (which lights are in the frustum, and which shader pass draws each). Normally
 		/// already running since <c>OnCameraPreCull</c>; the render function waits for it, as late as possible.
 		/// </summary>
-		private void EnsureCullingStarted(UniversalCameraData cameraData, Camera culledCamera)
+		private void EnsureCullingStarted(Camera camera, Camera culledCamera, Matrix4x4 view, Matrix4x4 projection,
+			Vector3 position)
 		{
-			LastCullingStartedEarly = culledCamera == cameraData.camera;
+			LastCullingStartedEarly = culledCamera == camera;
 
 			if (LastCullingStartedEarly == false)
-				ScheduleCulling(cameraData.camera, cameraData.GetViewMatrix(), cameraData.GetProjectionMatrix(),
-					cameraData.worldSpaceCameraPos);
-		}
-
-		/// <summary>
-		/// MSAA sample count of the camera's depth attachment (at least 1).
-		/// </summary>
-		/// <returns>False when there is no scene depth to read (warned once).</returns>
-		private bool TryGetMsaaSamples(RenderGraph renderGraph, UniversalResourceData resources, UniversalCameraData cameraData,
-			out int msaaSamples)
-		{
-			// Without scene depth the pass may draw straight onto an imported camera target, whose descriptor RenderGraph
-			// can't give; the count then only decides whether the composite keeps the depth attached.
-			msaaSamples = _useSceneDepth
-				? math.max(1, (int)renderGraph.GetTextureDesc(resources.activeDepthTexture).msaaSamples)
-				: math.max(1, cameraData.cameraTargetDescriptor.msaaSamples);
-
-			if (NeedsCameraDepthTexture(msaaSamples) == false || resources.cameraDepthTexture.IsValid())
-				return true;
-
-			if (_warnedMissingDepth == false)
-			{
-				Debug.LogWarning(StringUtils.PrependFulumaPrefix(MissingDepthTextureMessage));
-				_warnedMissingDepth = true;
-			}
-
-			return false;
+				ScheduleCulling(camera, view, projection, position);
 		}
 
 		/// <summary>
@@ -1234,32 +1032,6 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			_material.SetKeyword(_depthInputKeyword, single);
 			_material.SetKeyword(_depthInputMsaaKeyword, multi);
 			_holderVersion++;
-		}
-
-		/// <summary>
-		/// The outside pass (1) depth-tests its front faces against the scene, so the GPU rejects occluded pixels before
-		/// the fragment program runs. That needs the scene depth bound read-only as the depth attachment.
-		/// </summary>
-		private void BindSceneDepth(IRasterRenderGraphBuilder builder, UniversalResourceData resources)
-		{
-			// No scene depth: no depth attachment either, so the outside pass's depth test can't hide anything.
-			if (_useSceneDepth == false)
-				return;
-
-#if UNITY_6000_6_OR_NEWER
-			if (_depthAsInputAttachment)
-			{
-				// RenderGraph binds a depth input attachment as the read-only depth attachment too (the backends require
-				// it), and rejects an explicit SetRenderAttachmentDepth of the same texture.
-				builder.SetExtendedFeatureFlags(ExtendedFeatureFlags.DepthAttachmentAsInputAttachment);
-				builder.SetInputAttachment(resources.activeDepthTexture, 0);
-				return;
-			}
-#endif
-
-			// The fragment program reads the _CameraDepthTexture copy; the attachment itself is only depth-tested.
-			builder.SetRenderAttachmentDepth(resources.activeDepthTexture, AccessFlags.Read);
-			builder.UseTexture(resources.cameraDepthTexture);
 		}
 
 		/// <summary>
@@ -1426,13 +1198,21 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			Large
 		}
 
-		private class RasterPassData
+		/// <summary>
+		/// The command buffer a light pass draws through: RenderGraph's raster command buffer, or URP's plain one in
+		/// Compatibility Mode. The draw loop is generic over it (a struct), so neither path boxes or allocates.
+		/// </summary>
+		private interface IDrawCommands
 		{
-			/// <summary>
-			/// Downsampled buffer only: the low-resolution depth the shader reads.
-			/// </summary>
-			public TextureHandle LowResDepth;
+			void DrawMeshInstancedProcedural(Mesh mesh, int submesh, Material material, int shaderPass, int count,
+				MaterialPropertyBlock properties);
+		}
 
+		/// <summary>
+		/// What one light pass draws, filled when it is recorded (<see cref="FillPassData"/>).
+		/// </summary>
+		private class DrawPassData
+		{
 			public SpotLightGpuMirror Mirror;
 			public FulumaSpotLightRenderPass Pass;
 			public Camera Camera;
