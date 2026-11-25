@@ -48,6 +48,32 @@ Both paths on 6.0–6.3 are covered by running the suite once per mode (decision
 warnings on 6000.7.0b4, 6000.3.0f1 (also with `URP_COMPATIBILITY_MODE`), 6000.0.85f2, 2022.3.62f3 and 2022.3.20f1
 (which resolves URP 14.0.10, Burst 1.8.25, Collections 2.6.2, Mathematics 1.3.3).
 
+## Cost on a phone (2026-11-25)
+
+Xiaomi 15C (Mali-G52 MC2, Vulkan), the stress scene with 1024 frozen lights (433 drawn), MSAA 1, 22 s runs, GPU
+cycles per frame (Mali counters, average of the last 5 frames). Players: the 2022.3 profiling project
+(`M:/Unity/Projects/Fuluma2022`), the 6000.0 one (`M:/Unity/Projects/Fuluma6000`, one player per mode, two
+alternating rounds within 0.5% of each other) and the dev project (6000.7.0b4). All at 42.5 °C, no throttling.
+
+| Configuration | 2022.3 Compatibility | 6000.0 Compatibility | 6000.0 RenderGraph | 6000.7 RenderGraph |
+|---|---|---|---|---|
+| Full resolution | 77.9 M | 79.9 M | 80.0 M | 83.7 M |
+| Light buffer 0.5, all lights | 26.5 M | 27.8 M | 27.9 M | 29.2 M |
+| Light buffer 0.5, LargeOnly | 45.1 M | 47.0 M | 47.7 M | 49.3 M |
+
+- **The paths cost the same in one Unity version** (6000.0: +0.1%, +0.4%, +1.5% for RenderGraph). The first comparison
+  (2022.3 Compatibility vs 6000.7 RenderGraph, ~7% apart) measured Unity versions, not paths.
+- **2022.3 → 6000.0 (+2.6%, both Compatibility):** about one more full screen of pixels written per frame (5.3 M →
+  6.4 M) and ~7 MB more external writes: URP 17 does more full-screen work around the frame, whatever the path.
+- **6000.0 → 6000.7 (+4.6%, both RenderGraph):** shader fragment cycles +5% in every configuration, including the
+  light buffer at 0.5 where the depth input attachment isn't used, with nearly the same ALU issue cycles (+1-3%). So
+  most of it isn't the input attachment; likely shader code generation in 6000.7 (beta) or URP 17.7's shader library.
+  Not confirmed (Mali's offline compiler is unavailable here). At full resolution 6000.7 also reads depth as an input
+  attachment: fewer texture issue cycles (5.0 M vs 7.9 M) and no depth copy (4.1 M vs 6.4 M pixels), no net gain.
+- RenderGraph runs 2-4 M more fragment threads than Compatibility in 6000.0 at no measurable cost.
+- Straight-to-screen cameras on the compatibility path needed the composite flip (fixed in `046aff2`, verified on the
+  phone with HDR and scene depth off).
+
 ## Compatibility Mode by version
 
 Sources: Unity's 6.2/6.3 upgrade guides, the 6000.4.0a4 release notes, the official "Render Graph Updates in Unity
