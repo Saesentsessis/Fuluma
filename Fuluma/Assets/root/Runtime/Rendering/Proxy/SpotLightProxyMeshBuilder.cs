@@ -226,47 +226,65 @@ namespace Saesentsessis.Fuluma.Rendering.Proxy
 		/// Fits the cap inflation: for outer half-angles up to the clamp, the plane of every cap face must stay at least
 		/// the light's range from the light origin. Stores the worst face angle per radian of widened half-angle.
 		/// </summary>
+		/// <remarks>
+		/// In double precision: the smallest probes make faces ~0.009 wide next to z = 1 with face angles of ~0.0025 rad,
+		/// where float32 keeps only a few digits of the edge vectors and of the angle (MeshGen's Mono and Burst vertices,
+		/// one rounding step apart, gave fitted shapes 0.6% apart). The vertices themselves stay float32.
+		/// </remarks>
 		private static SpotLightProxyShape FitShape(Vector3[] vertices, int[] indices, int rimSegments, int capIndexStart)
 		{
 			var cosSegment = math.cos(math.PI / rimSegments);
-			var probe = new SpotLightProxyShape(cosSegment, 0f);
-			var capAnglePerWidened = 0f;
+			var capAnglePerWidened = 0.0;
 
 			for (var degrees = FitStepDegrees; degrees <= SpotLightData.MaxOuterHalfAngleDegrees; degrees += FitStepDegrees)
 			{
-				probe.Evaluate(math.cos(math.radians(degrees)), out var widened, out _);
+				// SpotLightProxyShape.Evaluate's widened half-angle, in double.
+				math.sincos(math.radians((double)degrees), out var sinOuter, out var cosOuter);
+				var widened = math.atan2(sinOuter, cosOuter * cosSegment);
 
 				var faceAngle = LargestCapFaceAngle(vertices, indices, capIndexStart, widened);
 				capAnglePerWidened = math.max(capAnglePerWidened, faceAngle / widened);
 			}
 
-			return new SpotLightProxyShape(cosSegment, capAnglePerWidened * FitMargin);
+			return new SpotLightProxyShape(cosSegment, (float)capAnglePerWidened * FitMargin);
 		}
 
 		/// <summary>
 		/// Largest angular size of a cap face (half the angle its plane cuts from the unit sphere around the light),
 		/// with the proxy widened to <paramref name="widenedHalfAngle"/> and not inflated.
 		/// </summary>
-		private static float LargestCapFaceAngle(Vector3[] vertices, int[] indices, int capIndexStart, float widenedHalfAngle)
+		private static double LargestCapFaceAngle(Vector3[] vertices, int[] indices, int capIndexStart, double widenedHalfAngle)
 		{
-			var largest = 0f;
+			var largest = 0.0;
 
 			for (var i = capIndexStart; i < indices.Length; i += 3)
 			{
-				var a = SpotLightProxyShape.MapVertex(vertices[indices[i]], 1f, widenedHalfAngle, 1f);
-				var b = SpotLightProxyShape.MapVertex(vertices[indices[i + 1]], 1f, widenedHalfAngle, 1f);
-				var c = SpotLightProxyShape.MapVertex(vertices[indices[i + 2]], 1f, widenedHalfAngle, 1f);
+				var a = MapCapVertex(vertices[indices[i]], widenedHalfAngle);
+				var b = MapCapVertex(vertices[indices[i + 1]], widenedHalfAngle);
+				var c = MapCapVertex(vertices[indices[i + 2]], widenedHalfAngle);
 
 				var normal = math.cross(b - a, c - a);
 				var length = math.length(normal);
-				if (length < 1e-9f)
+				if (length < 1e-18)
 					continue; // degenerate face (all vertices on the tip)
 
-				var planeDistance = math.abs(math.dot(normal / length, a));
-				largest = math.max(largest, math.acos(math.saturate(planeDistance)));
+				// atan2 of sine and cosine: acos of a cosine this close to 1 loses most of the angle's digits.
+				var unitNormal = normal / length;
+				var planeDistance = math.abs(math.dot(unitNormal, a));
+				largest = math.max(largest, math.atan2(math.length(math.cross(unitNormal, a)), planeDistance));
 			}
 
 			return largest;
+		}
+
+		/// <summary>
+		/// <see cref="SpotLightProxyShape.MapVertex"/> for a cap vertex (z >= 0) in double, with range and inflation 1: on the
+		/// unit sphere around the light.
+		/// </summary>
+		private static double3 MapCapVertex(Vector3 proxy, double widenedHalfAngle)
+		{
+			math.sincos((1.0 - proxy.z) * widenedHalfAngle, out var sinPolar, out var cosPolar);
+			return new double3(proxy.x * sinPolar, proxy.y * sinPolar, cosPolar);
 		}
 
 		/// <summary>
