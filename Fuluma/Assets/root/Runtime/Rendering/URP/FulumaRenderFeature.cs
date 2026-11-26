@@ -73,7 +73,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		[Tooltip("Cameras draw this feature's fake lights only if their culling mask includes one of these layers, as if the lights lived on them. Preview cameras never draw them.")]
 		[SerializeField] private LayerMask cameraLayers = ~0;
 
-		[Tooltip("Global multiplier on the brightness of every fake light this feature draws, whatever its type.")]
+		[Tooltip("Global multiplier on the brightness of every fake light this feature draws, whatever its type. 0 skips the feature entirely: no culling, no passes.")]
 		[SerializeField, Min(0f)] private float lightIntensity = DefaultLightIntensity;
 
 		[Header("Scattering")]
@@ -255,7 +255,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 
 		/// <summary>
 		/// Global multiplier on the brightness of every fake light this feature draws, whatever its type; at least 0.
-		/// Applies immediately.
+		/// Applies immediately. At 0 the feature does no work at all: no culling, no passes for any camera.
 		/// </summary>
 		public float LightIntensity
 		{
@@ -651,8 +651,8 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 
 		/// <summary>
-		/// Enqueues the spot light pass (and, with <see cref="LightBufferTiming"/>, its early light buffer pass) for
-		/// cameras whose culling mask overlaps <see cref="CameraLayers"/>; preview cameras are skipped.
+		/// Enqueues the spot light pass (and, with <see cref="LightBufferTiming"/>, its early light buffer pass) for the
+		/// cameras <see cref="DrawsFor"/> accepts.
 		/// </summary>
 		public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
 		{
@@ -856,12 +856,13 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 
 		/// <summary>
-		/// Cameras the lights are drawn for: not previews, not rendering only into a depth texture (nothing to draw into;
-		/// skipping them here also saves their culling and URP's depth copy), and seeing <see cref="CameraLayers"/>.
+		/// Cameras the lights are drawn for: none while <see cref="LightIntensity"/> is 0 (everything would draw black), and
+		/// otherwise not previews, not cameras rendering only into a depth texture (nothing to draw into), and only cameras
+		/// seeing <see cref="CameraLayers"/>. A skipped camera gets neither culling nor passes, nor URP's depth copy.
 		/// </summary>
 		private bool DrawsFor(Camera camera)
-			=> camera != null && camera.cameraType != CameraType.Preview && (camera.cullingMask & cameraLayers) != 0
-			   && RendersDepthOnly(camera) == false;
+			=> lightIntensity > 0f && camera != null && camera.cameraType != CameraType.Preview
+			   && (camera.cullingMask & cameraLayers) != 0 && RendersDepthOnly(camera) == false;
 
 #if UNITY_EDITOR
 		/// <summary>

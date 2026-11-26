@@ -39,7 +39,7 @@ upscaled. It works with URP's RenderGraph and in URP's Compatibility Mode (see
 |-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|-----------------|--------------------|
 | Override Store  | The store whose lights this feature draws. Empty: the default store, where components register unless they name a store of their own.             | None (default store) | Any Light Store | Recreates the pass |
 | Camera Layers   | Cameras draw the lights only if their culling mask includes one of these layers, as if the lights lived on them. Preview cameras never draw them. | Everything           | Any layer mask  | Immediate          |
-| Light Intensity | Global multiplier on the brightness of every fake light the feature draws, whatever its type.                                                     | 1                    | ≥ 0             | Immediate          |
+| Light Intensity | Global multiplier on the brightness of every fake light the feature draws, whatever its type. 0 skips the feature: no culling, no passes.         | 1                    | ≥ 0             | Immediate          |
 
 **Scattering**
 
@@ -134,6 +134,8 @@ public static void DrawStore(UniversalRendererData rendererData, LightStore leve
   setups in a shader variant collection on Project Settings > Fuluma, or use Custom mode there. Light Buffer Scale is
   safe to change at runtime.
 - **Max Spot Lights.** Visible lights past the limit are skipped, with a warning logged once.
+- **Lights that emit nothing** (intensity 0, color alpha 0, or a black color) are skipped by culling at no extra
+  cost, so dimming a light to 0 removes its draw too. With **Light Intensity** at 0 the whole feature does nothing.
 - **Preview cameras** (inspector and asset previews) and cameras rendering into a depth-only texture never draw fake
   lights.
 - **No lights, no buffer.** A downsampled buffer's passes (depth downsample, clear, composite) are whole-screen work,

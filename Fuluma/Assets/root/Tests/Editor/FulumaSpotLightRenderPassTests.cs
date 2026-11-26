@@ -1929,6 +1929,36 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 		}
 
 		/// <summary>
+		/// Light Intensity 0 skips the feature for every camera: no culling runs and nothing is drawn. Turning it back up
+		/// draws the same picture as before, from the next frame, without recreating the pass.
+		/// </summary>
+		[Test]
+		public void Render_ZeroLightIntensity_SkipsTheFeature()
+		{
+			const int size = 64;
+			using var scene = new RenderScene(size: size);
+			AddLargeTestLight(scene);
+			var lit = scene.RenderLightContribution();
+			var pass = scene.Feature.SpotLightRenderPass;
+
+			scene.Feature.LightIntensity = 0f;
+			Saesentsessis.Fuluma.Profiling.FulumaProfiling.LastVisibleSpotLights = -1;
+			var dark = scene.RenderLightContribution();
+
+			Assert.AreEqual(-1, Saesentsessis.Fuluma.Profiling.FulumaProfiling.LastVisibleSpotLights, "No culling should run.");
+			var brightest = 0f;
+			for (var y = 0; y < size; y++)
+			for (var x = 0; x < size; x++)
+				brightest = math.max(brightest, Luminance(dark.Pixel(x, y)));
+			Assert.AreEqual(0f, brightest, "Nothing should be drawn.");
+
+			scene.Feature.LightIntensity = 1f;
+			var again = scene.RenderLightContribution();
+			Assert.AreSame(pass, scene.Feature.SpotLightRenderPass, "The intensity shouldn't recreate the pass.");
+			AssertMatches(lit, again, size, 0.005f, "Light Intensity back to 1");
+		}
+
+		/// <summary>
 		/// With every light in the buffer: a camera that sees no lights skips the buffer's passes (its downsample and
 		/// composite are whole-screen work). Compatibility path: decided from this frame's culling. RenderGraph: from the
 		/// last frame's, and only where the full-resolution pass that stands in has its scene depth without an extra copy

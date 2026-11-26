@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In Compatibility Mode, **Large Only** decides from the current frame's culling whether large lights go through the
   buffer (RenderGraph uses the previous frame's, as before).
 - Cameras rendering into a depth-only texture no longer run the lights' culling or ask URP for its depth texture.
+- **Light Intensity 0 skips the render feature** for every camera: no culling, no passes, no depth copy request.
+- **Lights that emit nothing** (intensity 0, color alpha 0, or a black color) are skipped by culling at no extra cost
+  per light.
 
 ## [0.1.0] - 2026-11-24
 
