@@ -743,12 +743,22 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 				upsample: LightBufferUpsample.DepthAware);
 			try
 			{
-				pass.ConfigureDepthSource(1);
+				if (pass.UsesCompatibilityPath)
+				{
+					// The Compatibility path can sample the depth attachment only where URP certainly renders into an
+					// intermediate depth texture; otherwise it reads URP's depth texture.
+					pass.ConfigureDepthSource(1, intermediateDepth: false);
+					Assert.AreEqual(ScriptableRenderPassInput.Depth, pass.input & ScriptableRenderPassInput.Depth);
+				}
+
+				pass.ConfigureDepthSource(1, intermediateDepth: true);
 				Assert.AreEqual(ScriptableRenderPassInput.None, pass.input & ScriptableRenderPassInput.Depth);
+#if UNITY_6000_0_OR_NEWER
 				Assert.IsTrue(pass.requiresIntermediateTexture);
+#endif
 
 				// MSAA: the buffer's passes read single samples, so they need URP's resolved copy.
-				pass.ConfigureDepthSource(4);
+				pass.ConfigureDepthSource(4, intermediateDepth: true);
 				Assert.AreEqual(ScriptableRenderPassInput.Depth, pass.input & ScriptableRenderPassInput.Depth);
 			}
 			finally
@@ -856,7 +866,7 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 				Assert.IsFalse(pass.UsesDepthInputAttachment);
 				Assert.AreEqual(LightBufferUpsample.Bilinear, pass.Upsample, "Depth-aware upscaling needs scene depth.");
 
-				pass.ConfigureDepthSource(4);
+				pass.ConfigureDepthSource(4, intermediateDepth: false);
 				Assert.AreEqual(ScriptableRenderPassInput.None, pass.input & ScriptableRenderPassInput.Depth);
 
 				pass.LightBufferTiming = LightBufferTiming.BeforeOpaques;
@@ -1858,13 +1868,14 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 		}
 
 		/// <summary>
-		/// Culling finishes after the graph is recorded, so whether the downsampled buffer's passes are recorded depends on
-		/// the camera's previous culling. Without large lights there, they're skipped and the full-resolution pass draws
-		/// everything: a large light appearing in that frame is drawn at full resolution, never lost; the frame after, it
-		/// goes through the buffer.
+		/// RenderGraph: culling finishes after the graph is recorded, so whether the downsampled buffer's passes are
+		/// recorded depends on the camera's previous culling. Without large lights there, they're skipped and the
+		/// full-resolution pass draws everything: a large light appearing in that frame is drawn at full resolution, never
+		/// lost; the frame after, it goes through the buffer. Compatibility path: the pass waits for this frame's culling,
+		/// so the buffer's passes are recorded exactly in the frames with large lights.
 		/// </summary>
 		[Test]
-		public void Render_LargeLightsOnly_SkipsTheBufferAfterAFrameWithoutLargeLights()
+		public void Render_LargeLightsOnly_SkipsTheBufferWithoutLargeLights()
 		{
 			const int size = 128;
 
@@ -1884,25 +1895,100 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 			AddSmallTestLight(split);
 
 			var recorded = false;
+			var compatibility = false;
 			LightContribution Render() => split.RenderLightContribution(() =>
-				recorded = split.Feature.SpotLightRenderPass.LastRecordedLowResolutionPasses);
+			{
+				recorded = split.Feature.SpotLightRenderPass.LastRecordedLowResolutionPasses;
+				compatibility = split.Feature.SpotLightRenderPass.UsesCompatibilityPath;
+			});
 
 			var first = Render();
-			Assert.IsTrue(recorded, "First frame of a camera: the buffer's passes are recorded.");
-			AssertMatches(smallReference, first, size, 0.005f, "First frame (empty buffer)");
+			Assert.AreEqual(compatibility == false, recorded,
+				compatibility ? "No large lights: no buffer passes." : "First frame of a camera: the buffer's passes are recorded.");
+			AssertMatches(smallReference, first, size, 0.005f, "First frame");
 
 			var second = Render();
-			Assert.IsFalse(recorded, "No large lights in the last frame: no buffer passes.");
+			Assert.IsFalse(recorded, "No large lights (in the last frame): no buffer passes.");
 			AssertMatches(smallReference, second, size, 0.005f, "Without buffer passes");
 
 			AddLargeTestLight(split);
 			var third = Render();
+			if (compatibility)
+			{
+				Assert.IsTrue(recorded, "A large light this frame: the buffer's passes are recorded.");
+				AssertMatches(bothReference, third, size, 0.15f, "A large light appearing, through the buffer");
+				return;
+			}
+
 			Assert.IsFalse(recorded, "The last frame still had no large lights.");
 			AssertMatches(bothReference, third, size, 0.005f, "A large light appearing without buffer passes (full resolution)");
 
 			var fourth = Render();
 			Assert.IsTrue(recorded, "The last frame had a large light: the buffer's passes are back.");
 			AssertMatches(bothReference, fourth, size, 0.15f, "The large light through the buffer");
+		}
+
+		/// <summary>
+		/// With every light in the buffer: a camera that sees no lights skips the buffer's passes (its downsample and
+		/// composite are whole-screen work). Compatibility path: decided from this frame's culling. RenderGraph: from the
+		/// last frame's, and only where the full-resolution pass that stands in has its scene depth without an extra copy
+		/// (depth input attachment); a light appearing then is drawn at full resolution for one frame.
+		/// </summary>
+		[Test]
+		public void Render_LightBuffer_SkippedWhileNoLightIsVisible()
+		{
+			const int size = 128;
+
+			LightContribution fullReference, bufferReference;
+			using (var scene = new RenderScene(size: size))
+			{
+				AddLargeTestLight(scene);
+				fullReference = scene.RenderLightContribution();
+				scene.UseLightBufferScale(0.25f);
+				bufferReference = scene.RenderLightContribution();
+			}
+
+			using var buffered = new RenderScene(size: size);
+			buffered.UseLightBufferScale(0.25f);
+
+			// Behind the camera, pointing away: in the store, never visible.
+			buffered.AddLight(new Vector3(0f, 0f, -40f), Quaternion.LookRotation(Vector3.back));
+
+			var recorded = false;
+			var compatibility = false;
+			var fallback = false;
+			LightContribution Render() => buffered.RenderLightContribution(() =>
+			{
+				var pass = buffered.Feature.SpotLightRenderPass;
+				recorded = pass.LastRecordedLowResolutionPasses;
+				compatibility = pass.UsesCompatibilityPath;
+				fallback = pass.UsesDepthInputAttachment || pass.UsesSceneDepth == false;
+			});
+
+			var first = Render();
+			Assert.AreEqual(compatibility == false, recorded,
+				compatibility ? "Nothing visible: no buffer passes." : "First frame of a camera: the buffer's passes are recorded.");
+			Assert.AreEqual(0, first.BadPixelCount);
+
+			Render();
+			Assert.AreEqual(compatibility == false && fallback == false, recorded,
+				"Nothing visible (in the last frame): no buffer passes, unless the full-resolution stand-in would need a depth copy.");
+
+			AddLargeTestLight(buffered);
+			var appearing = Render();
+			if (compatibility || fallback == false)
+			{
+				Assert.IsTrue(recorded, "The buffer's passes are recorded.");
+				AssertMatches(bufferReference, appearing, size, 0.01f, "A light appearing, through the buffer");
+				return;
+			}
+
+			Assert.IsFalse(recorded, "The last frame had no visible light: full resolution.");
+			AssertMatches(fullReference, appearing, size, 0.005f, "A light appearing at full resolution");
+
+			var next = Render();
+			Assert.IsTrue(recorded, "The last frame had a visible light: the buffer's passes are back.");
+			AssertMatches(bufferReference, next, size, 0.01f, "The light through the buffer");
 		}
 
 		// Looking along the beam from behind the light, view direction pitched 25 degrees from the light axis

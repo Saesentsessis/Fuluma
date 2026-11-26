@@ -1,11 +1,8 @@
 using System;
-using Saesentsessis.Fuluma.Profiling;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
-using UnityEngine.Rendering.Universal;
 #if UNITY_6000_5_OR_NEWER
 using Unity.Scripting.LifecycleManagement;
 #endif
@@ -32,12 +29,15 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	/// by bilinear weight and depth similarity (joint bilateral upsampling), and takes the nearest in depth when none
 	/// is close.</item>
 	/// </list>
+	/// This file holds what doesn't depend on how URP runs the passes; <c>DownsampledLightBuffer.RenderGraph.cs</c>
+	/// records them into URP's render graph (Unity 6), <c>DownsampledLightBuffer.Compatibility.cs</c> runs them from the
+	/// spot light pass's <c>Execute</c> (Unity 2022.3, and Compatibility Mode on 6.0-6.3).
 	/// </remarks>
 #if UNITY_6000_5_OR_NEWER
 	// Immutable: shader property IDs and constants.
 	[NoAutoStaticsCleanup]
 #endif
-	internal sealed class DownsampledLightBuffer : IDisposable
+	internal sealed partial class DownsampledLightBuffer : IDisposable
 	{
 		public const string ShaderName = "Hidden/Fuluma/LightBuffer";
 
@@ -54,60 +54,26 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		private static readonly int CameraDepthId = Shader.PropertyToID("_FulumaCameraDepth");
 		private static readonly Vector4 FullScaleBias = new(1f, 1f, 0f, 0f);
 
+		// Unity 2022.3 names the format usages FormatUsage; Unity 6 GraphicsFormatUsage.
+#if UNITY_6000_0_OR_NEWER
+		private const GraphicsFormatUsage BlendUsage = GraphicsFormatUsage.Blend;
+		private const GraphicsFormatUsage RenderUsage = GraphicsFormatUsage.Render;
+#else
+		private const FormatUsage BlendUsage = FormatUsage.Blend;
+		private const FormatUsage RenderUsage = FormatUsage.Render;
+#endif
+
 		/// <summary>
 		/// <c>ceil(size × scale)</c>, at least 1. The small slack keeps float rounding from adding a pixel when the product is
 		/// a whole number (1920 × 0.3).
 		/// </summary>
 		internal static int ScaledSize(int size, float scale) => math.max(1, (int)math.ceil(size * scale - 1e-3f));
 
-		private static void Blit(BlitPassData data, RasterGraphContext context)
-		{
-			// Textures resolve only while the graph executes; the material is this buffer's own.
-			if (data.LowResDepth.IsValid())
-			{
-				RTHandle lowResDepth = data.LowResDepth;
-				data.Material.SetTexture(LowResDepthId, lowResDepth);
-			}
-
-			if (data.CameraDepth.IsValid())
-			{
-				RTHandle cameraDepth = data.CameraDepth;
-				data.Material.SetTexture(CameraDepthId, cameraDepth);
-			}
-
-			Blitter.BlitTexture(context.cmd, data.Source, FullScaleBias, data.Material, data.Pass);
-		}
-
-		/// <summary>
-		/// A low-resolution texture that matches the camera color wherever the lights and the composite rely on it:
-		/// dimension and slices (a texture array with single-pass XR), XR usage and dynamic resolution. Everything else
-		/// differs on purpose (size, format, one sample, no mips), so it starts from a fresh descriptor and copies those
-		/// fields, instead of copying the camera's and resetting the rest (which would also inherit fields added later).
-		/// </summary>
-		private static TextureDesc LowResDesc(in TextureDesc camera, int width, int height, string name) => new(width, height)
-		{
-			dimension = camera.dimension,
-			slices = camera.slices,
-			vrUsage = camera.vrUsage,
-			useDynamicScale = camera.useDynamicScale,
-			useDynamicScaleExplicit = camera.useDynamicScaleExplicit,
-			name = name,
-			wrapMode = TextureWrapMode.Clamp
-		};
-
-		private static TextureDesc DepthDesc(int width, int height, in TextureDesc camera)
-		{
-			var desc = LowResDesc(camera, width, height, "_FulumaLowResDepthBuffer");
-			desc.depthBufferBits = DepthBits.Depth32;
-			desc.filterMode = FilterMode.Point;
-			return desc;
-		}
-
 		/// <summary>
 		/// Packed 11:11:10 float when it can be blended into (half the bandwidth; no alpha needed), else RGBA half.
 		/// </summary>
 		private static GraphicsFormat PickLightFormat()
-			=> SystemInfo.IsFormatSupported(GraphicsFormat.B10G11R11_UFloatPack32, GraphicsFormatUsage.Blend)
+			=> SystemInfo.IsFormatSupported(GraphicsFormat.B10G11R11_UFloatPack32, BlendUsage)
 				? GraphicsFormat.B10G11R11_UFloatPack32
 				: GraphicsFormat.R16G16B16A16_SFloat;
 
@@ -115,7 +81,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// Eye depth in 32-bit float; 16-bit is a last resort (~0.1% relative steps).
 		/// </summary>
 		private static GraphicsFormat PickRawDepthFormat()
-			=> SystemInfo.IsFormatSupported(GraphicsFormat.R32_SFloat, GraphicsFormatUsage.Render)
+			=> SystemInfo.IsFormatSupported(GraphicsFormat.R32_SFloat, RenderUsage)
 				? GraphicsFormat.R32_SFloat
 				: GraphicsFormat.R16_SFloat;
 
@@ -137,6 +103,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			_material.SetKeyword(new LocalKeyword(shader, CheckerboardKeywordName), upsample == LightBufferUpsample.DepthAware);
 			_lightFormat = PickLightFormat();
 			_rawDepthFormat = PickRawDepthFormat();
+			OnCreated();
 		}
 
 		/// <summary>
@@ -152,172 +119,53 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		public LightBufferUpsample Upsample { get; }
 
 		/// <summary>
-		/// Allocates this camera's targets and records the depth downsample from <paramref name="cameraDepth"/>
-		/// (single-sampled: the camera's depth attachment, URP's resolved <c>_CameraDepthTexture</c> with MSAA, or the
-		/// depth prepass's depth).
+		/// Shader pass of the composite <see cref="Upsample"/> picks.
 		/// </summary>
-		/// <param name="cameraColor">The camera's color target: the targets copy its dimension and slices (2D, or a
-		/// texture array with single-pass XR), so they match how the shaders declare them.</param>
-		public Targets RecordDownsample(RenderGraph renderGraph, TextureHandle cameraDepth, in TextureDesc cameraColor,
-			int cameraWidth, int cameraHeight)
-		{
-			var width = ScaledSize(cameraWidth, _scale);
-			var height = ScaledSize(cameraHeight, _scale);
-
-			var targets = new Targets(
-				renderGraph.CreateTexture(LightDesc(width, height, cameraColor)),
-				renderGraph.CreateTexture(DepthDesc(width, height, cameraColor)),
-				renderGraph.CreateTexture(RawDepthDesc(width, height, cameraColor)),
-				new Vector2Int(width, height));
-
-			// URP records and executes one camera before recording the next, so this holds for this camera's pass.
-			_material.SetVector(DownsampleSizesId, new Vector4(cameraWidth, cameraHeight, width, height));
-
-			using var builder = renderGraph.AddRasterRenderPass(FulumaProfiling.DownsampleDepthName, out BlitPassData data,
-				FulumaProfiling.DownsampleDepthSampler);
-
-			builder.UseTexture(cameraDepth);
-			builder.SetRenderAttachment(targets.RawDepth, 0, AccessFlags.Write);
-			builder.SetRenderAttachmentDepth(targets.Depth, AccessFlags.Write);
-			builder.AllowGlobalStateModification(false);
-
-			// Pass data is pooled: every field is set, or a composite's old handles would reach Blit.
-			data.Source = cameraDepth;
-			data.LowResDepth = TextureHandle.nullHandle;
-			data.CameraDepth = TextureHandle.nullHandle;
-			data.Material = _material;
-			data.Pass = DownsampleDepthPass;
-			builder.SetRenderFunc(static (BlitPassData pData, RasterGraphContext context) => Blit(pData, context));
-
-			return targets;
-		}
-
-		/// <summary>
-		/// The light buffer alone, for lights that don't read scene depth (no depth downsample; <see cref="Targets.Depth"/>
-		/// and <see cref="Targets.RawDepth"/> are invalid). Composite it bilinearly.
-		/// </summary>
-		public Targets CreateLightTarget(RenderGraph renderGraph, in TextureDesc cameraColor, int cameraWidth, int cameraHeight)
-		{
-			var width = ScaledSize(cameraWidth, _scale);
-			var height = ScaledSize(cameraHeight, _scale);
-			return new Targets(renderGraph.CreateTexture(LightDesc(width, height, cameraColor)), TextureHandle.nullHandle,
-				TextureHandle.nullHandle, new Vector2Int(width, height));
-		}
-
-		/// <summary>
-		/// Records the pass that adds the light buffer of <paramref name="targets"/> onto <paramref name="cameraColor"/>,
-		/// upscaled as <see cref="Upsample"/> says (depth-aware reads <paramref name="cameraDepth"/>, the same depth the
-		/// downsample read).
-		/// </summary>
-		/// <param name="cameraDepth">Full-resolution depth the depth-aware composite samples.</param>
-		/// <param name="depthAttachment">Kept attached read-only when valid (the camera's depth attachment), so RenderGraph
-		/// can merge the composite with the camera's neighbouring passes instead of storing and reloading the camera color
-		/// around it. Never the texture the depth-aware composite samples. Reading the depth as an input attachment
-		/// instead (which would allow the merge for it too) measured slower on Mali-G52 and G77 (2026-11-18,
-		/// <c>docs/dev/PixelShaderIdeas.md</c>).</param>
-		public void RecordComposite(RenderGraph renderGraph, in Targets targets, TextureHandle cameraColor, TextureHandle cameraDepth,
-			TextureHandle depthAttachment)
-		{
-			var depthAware = Upsample == LightBufferUpsample.DepthAware;
-
-			using var builder = renderGraph.AddRasterRenderPass(FulumaProfiling.CompositeName, out BlitPassData data,
-				FulumaProfiling.CompositeSampler);
-
-			builder.UseTexture(targets.Light);
-			if (depthAware)
-			{
-				builder.UseTexture(targets.RawDepth);
-				builder.UseTexture(cameraDepth);
-				_material.SetVector(LowResSizeId, new Vector4(targets.Size.x, targets.Size.y, 0f, 0f));
-			}
-
-			if (depthAttachment.IsValid())
-				builder.SetRenderAttachmentDepth(depthAttachment, AccessFlags.Read);
-
-			builder.SetRenderAttachment(cameraColor, 0, AccessFlags.ReadWrite);
-			builder.AllowGlobalStateModification(false);
-
-			data.Source = targets.Light;
-			data.LowResDepth = depthAware ? targets.RawDepth : TextureHandle.nullHandle;
-			data.CameraDepth = depthAware ? cameraDepth : TextureHandle.nullHandle;
-			data.Material = _material;
-			data.Pass = depthAware ? DepthAwareCompositePass : BilinearCompositePass;
-			builder.SetRenderFunc(static (BlitPassData pData, RasterGraphContext context) => Blit(pData, context));
-		}
+		private int CompositePass => Upsample == LightBufferUpsample.DepthAware ? DepthAwareCompositePass : BilinearCompositePass;
 
 		public void Dispose()
 		{
 			if (_material == null)
 				return;
 
+			OnDisposing();
 			CoreUtils.Destroy(_material);
 			_material = null;
 		}
 
-		private TextureDesc LightDesc(int width, int height, in TextureDesc camera)
-		{
-			var desc = LowResDesc(camera, width, height, "_FulumaLightBuffer");
-			desc.format = _lightFormat;
-			desc.filterMode = FilterMode.Bilinear;
-			desc.clearBuffer = true;
-			desc.clearColor = Color.clear;
-			return desc;
-		}
-
-		private TextureDesc RawDepthDesc(int width, int height, in TextureDesc camera)
-		{
-			var desc = LowResDesc(camera, width, height, "_FulumaLowResDepth");
-			desc.format = _rawDepthFormat;
-			desc.filterMode = FilterMode.Point;
-			return desc;
-		}
+		/// <summary>
+		/// Lets a render path create what it needs beside the material.
+		/// </summary>
+		partial void OnCreated();
 
 		/// <summary>
-		/// Textures of one camera's downsampled light buffer.
+		/// Lets a render path release what <see cref="OnCreated"/> or its passes created.
 		/// </summary>
-		public readonly struct Targets
+		partial void OnDisposing();
+
+		/// <summary>
+		/// The downsample's camera and low-resolution sizes. URP records and executes one camera before recording the next,
+		/// so this holds for this camera's pass.
+		/// </summary>
+		private static void SetDownsampleSizes(Material material, int cameraWidth, int cameraHeight, int width, int height)
+			=> material.SetVector(DownsampleSizesId, new Vector4(cameraWidth, cameraHeight, width, height));
+
+		/// <summary>
+		/// The depth-aware composite's low-resolution size.
+		/// </summary>
+		private static void SetCompositeSize(Material material, Vector2Int size)
+			=> material.SetVector(LowResSizeId, new Vector4(size.x, size.y, 0f, 0f));
+
+		/// <summary>
+		/// The textures a blit reads besides its source, set only when given (the material is this buffer's own).
+		/// </summary>
+		private void BindBlitTextures(Texture lowResDepth, Texture cameraDepth)
 		{
-			/// <summary>
-			/// Cleared to black; the lights add into it.
-			/// </summary>
-			public readonly TextureHandle Light;
+			if (lowResDepth != null)
+				_material.SetTexture(LowResDepthId, lowResDepth);
 
-			/// <summary>
-			/// Low-resolution depth buffer, for the outside pass's depth test.
-			/// </summary>
-			public readonly TextureHandle Depth;
-
-			/// <summary>
-			/// The same depth as linear eye depth in an R32F texture, read by the light shader and the depth-aware
-			/// composite (<c>_FulumaLowResDepth</c>).
-			/// </summary>
-			public readonly TextureHandle RawDepth;
-
-			/// <summary>
-			/// Size of the low-resolution textures in pixels.
-			/// </summary>
-			public readonly Vector2Int Size;
-
-			public Targets(TextureHandle light, TextureHandle depth, TextureHandle rawDepth, Vector2Int size)
-			{
-				Light = light;
-				Depth = depth;
-				RawDepth = rawDepth;
-				Size = size;
-			}
-		}
-
-		private class BlitPassData
-		{
-			public TextureHandle Source;
-
-			/// <summary>
-			/// Depth-aware composite only (else invalid); the camera depth only when read as a texture.
-			/// </summary>
-			public TextureHandle LowResDepth, CameraDepth;
-
-			public Material Material;
-			public int Pass;
+			if (cameraDepth != null)
+				_material.SetTexture(CameraDepthId, cameraDepth);
 		}
 	}
 }

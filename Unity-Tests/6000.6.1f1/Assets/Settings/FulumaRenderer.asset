@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de640fe3d0db1804a85f9fc8f5cadab6, type: 3}
+  m_Name: FulumaRenderer
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalRendererData
+  debugShaders:
+    debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7, type: 3}
+    hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
+    probeVolumeSamplingDebugComputeShader: {fileID: 7200000, guid: 53626a513ea68ce47b59dc1299fe3959, type: 3}
+  probeVolumeResources:
+    probeVolumeDebugShader: {fileID: 0}
+    probeVolumeFragmentationDebugShader: {fileID: 0}
+    probeVolumeOffsetDebugShader: {fileID: 0}
+    probeVolumeSamplingDebugShader: {fileID: 0}
+    probeSamplingDebugMesh: {fileID: 0}
+    probeSamplingDebugTexture: {fileID: 0}
+    probeVolumeBlendStatesCS: {fileID: 0}
+  m_RendererFeatures:
+  - {fileID: 4649048941243166404}
+  m_RendererFeatureMap: c46e345e61bd8440
+  m_UseNativeRenderPass: 0
+  xrSystemData: {fileID: 0}
+  postProcessData: {fileID: 0}
+  m_AssetVersion: 3
+  m_PrepassLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_OpaqueLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_TransparentLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_DefaultStencilState:
+    overrideStencilState: 0
+    stencilReference: 0
+    stencilCompareFunction: 8
+    passOperation: 2
+    failOperation: 0
+    zFailOperation: 0
+  m_ShadowTransparentReceive: 1
+  m_RenderingMode: 0
+  m_DepthPrimingMode: 0
+  m_CopyDepthMode: 1
+  m_DepthAttachmentFormat: 0
+  m_DepthTextureFormat: 0
+  m_AccurateGbufferNormals: 0
+  m_IntermediateTextureMode: 1
+--- !u!114 &4649048941243166404
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a950492ccd1347ca9277bdd87e5a99cd, type: 3}
+  m_Name: Fuluma
+  m_EditorClassIdentifier: Saesentsessis.Fuluma.Runtime::Saesentsessis.Fuluma.Rendering.URP.FulumaRenderFeature
+  m_Active: 1
+  event: 400
+  overrideStore: {fileID: 0}
+  cameraLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  lightIntensity: 1
+  scatteringPhase: 0
+  scatteringAnisotropy: 0.7
+  distanceFalloff: 0
+  lampGlare: 0
+  fidelityFeatures: 65543
+  nearPlaneFadeDistance: 0.5
+  dynamicBufferCount: 3
+  spotLightDescriptor: {fileID: 0}
+  maxSpotLights: 65536
+  spotLightBufferSize: 256
+  spotLightShader: {fileID: 4800000, guid: cf7c870b76acfe84d8c81a94ce073e15, type: 3}
+  clipBoxPieceLimit: 3
+  clipBoxBufferSize: 16
+  lightBufferScale: 0.5
+  lightBufferLights: 0
+  largeLightScreenSize: 0.15
+  lightBufferUpsample: 0
+  lightBufferTiming: 0
+  lightBufferShader: {fileID: 4800000, guid: d104cf9afeffe574baa4b6c569cb38d8, type: 3}
+  cullingShader: {fileID: 0}
+  cullingBackend: 0
