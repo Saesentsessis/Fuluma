@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-11-26
+
+### Added
+
+- **Unity 2022.3 support** (URP 14), from 2022.3.20f1. Every feature works there, the light buffer and its timings
+  included; verified with the full test suite on 2022.3.62f3 and on Android Vulkan (Mali-G52, Mali-G77).
+- **URP Compatibility Mode support**, wherever URP still has it: always on Unity 2022.3, through the Graphics settings'
+  checkbox on Unity 6.0 to 6.2, and on Unity 6.3 with Unity's `URP_COMPATIBILITY_MODE` scripting define. Every
+  feature works in both modes: full resolution, the downsampled light buffer (All and Large Only, both upsamplers) and
+  Before Opaques / Auto timing (Auto follows URP's Compatibility Mode prepass rules). Unity 6.4 and newer have only
+  RenderGraph. The pass reads the mode when it is created; switching it recreates URP's pipeline and with it the
+  feature's pass. Without depth input attachments there, full-resolution draws read URP's depth texture (URP adds a
+  depth copy); a downsampled light buffer skips that copy where the camera certainly renders into an intermediate
+  depth texture (HDR, the default). On the measured Mali phones both modes cost within a few percent of each other in
+  the same Unity version.
+- **Unity 6.0 to 6.2 support** on RenderGraph (Deferred+ needs 6.1).
+- A **Light Buffer Scene Depth** keyword group in shader variant stripping: the light buffer's Compatibility Mode
+  variant (`_FULUMA_CAMERA_DEPTH_TEXTURE`), kept only when the build's project uses Compatibility Mode.
+
+### Changed
+
+- **Minimum Unity version: 2022.3.20f1** (was 6000.3); the URP dependency is now `com.unity.render-pipelines.universal`
+  14.0.10 or newer. Unity 6 projects keep their own URP 17. Unity 2023.1 and 2023.2 are expected to work but are
+  untested.
+- **The light buffer skips its passes when a camera sees no lights.** Its depth downsample, clear and composite are
+  whole-screen work. In Compatibility Mode the pass waits for the camera's culling and decides from the current frame:
+  a camera looking away from every light measured 54-55% less GPU time on Mali phones. With RenderGraph, culling ends
+  after the frame is recorded, so the previous frame decides; with every light in the buffer, only where the depth
+  input attachment makes the full-resolution stand-in free (Unity 6.6 and newer).
+- In Compatibility Mode, **Large Only** decides from the current frame's culling whether large lights go through the
+  buffer (RenderGraph uses the previous frame's, as before).
+- Cameras rendering into a depth-only texture no longer run the lights' culling or ask URP for its depth texture.
+
 ## [0.1.0] - 2026-11-24
 
 ### Added
@@ -63,4 +96,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   support compute shaders and structured buffers in vertex shaders: verified on Direct3D 11 and 12 and on Vulkan
   (Mali-G52, Mali-G77); OpenGL ES 3.x isn't supported yet (Mali's drivers have no vertex-stage structured buffers).
 
+[0.2.0]: https://github.com/Saesentsessis/Fuluma/releases/tag/0.2.0
 [0.1.0]: https://github.com/Saesentsessis/Fuluma/releases/tag/0.1.0

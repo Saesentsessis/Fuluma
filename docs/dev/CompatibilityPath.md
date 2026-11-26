@@ -34,7 +34,7 @@ The old path is called the **compatibility path** below, whichever Unity version
 | Backbuffer depth load (URP, RenderGraph): RenderGraph's extra fragment threads explained | Done, see "Cost on phones" |
 | Efficiency fixes: no light buffer without lights, no needless depth copy, depth-only cameras, cached device queries | Done, see "Efficiency fixes" |
 | Composite merge experiment (RenderGraph) | Kept on branch `dev/urp_compatibility_mode_composite_merge` (`5ba5116`), not merged (user's choice): it removes RenderGraph's extra LargeOnly reload but not its cost; see "Cost on phones" |
-| 7. Release 0.2.0: installer, docs, CHANGELOG | |
+| 7. Release 0.2.0: installer, docs, CHANGELOG | Done (2026-11-26): version 0.2.0, CHANGELOG, README (Requirements, Platform Support, Core Features, install snippets; roadmap item removed), `Documentation~/FulumaRenderFeature.md` (Render paths section), Installer on 2022.3.62f3 (test framework 1.1.33; 13 tests pass, export works), `release.yml` installer version and test matrix |
 | Profiling project on 2022.3 (git-ignored), players, phone measurements | After the suite passes on 2022.3 and 6000.0 |
 
 EditMode suite (304 tests, 36 skipped by design: benchmarks, GPU-less cases), after phase 5:
