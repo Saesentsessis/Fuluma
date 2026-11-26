@@ -81,6 +81,11 @@ void FulumaClipBoxVaryings(uint reference, float3 cameraPosition, float3 viewVec
         float3 origin = cameraPosition + viewVector - forward * dot(viewVector, forward);
         flatTerm = mul(toBox, forward);
         interpolatedTerm = mul(toBox, origin) + offset;
+
+        // A camera looking along a box axis gives exact zeros here, and the slab test divides by the direction:
+        // Direct3D defines x / 0 as +-inf, OpenGL leaves it undefined (clip boxes then cut the wrong region). A tiny
+        // direction gives the same slabs with finite numbers.
+        flatTerm = abs(flatTerm) < FULUMA_CLIP_MIN_DIRECTION ? FULUMA_CLIP_MIN_DIRECTION : flatTerm;
     }
 }
 
