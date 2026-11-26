@@ -92,27 +92,28 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 				var keepDepthAttached = _earlyDepthIsAttachment == false || _lightBuffer.Upsample == LightBufferUpsample.Bilinear;
 				_lightBuffer.RecordComposite(renderGraph, _earlyTargets, resources.activeColorTexture, _earlyDepth,
 					keepDepthAttached ? resources.activeDepthTexture : TextureHandle.nullHandle);
+				LastRecordedLowResolutionPasses = true;
 				return;
 			}
 
-			if (SplitsLargeLights == false)
-			{
-				RecordLowResolutionPasses(renderGraph, resources, cameraData, msaaSamples, DrawSet.All, FulumaProfiling.DrawName,
-					FulumaProfiling.DrawSampler);
-				return;
-			}
-
-			// LargeOnly: small lights at full resolution; large and camera-inside lights through the downsampled buffer,
-			// unless the last culling of this camera found none (then the full-resolution pass draws everything).
+			// Through the buffer: every light, or with LargeOnly the large and camera-inside ones (the small ones at full
+			// resolution). Without lights for it last frame, the full-resolution pass draws everything instead.
 			var lowResolution = (_useSceneDepth == false || LightBufferDepthSource(resources, msaaSamples).IsValid())
-			                    && LowResolutionLightsLastFrame(camera);
+			                    && RecordsLightBuffer(camera, msaaSamples);
 			LastRecordedLowResolutionPasses = lowResolution;
 
-			RecordFullResolutionPass(renderGraph, resources, msaaSamples, camera, lowResolution ? DrawSet.Small : DrawSet.All);
+			if (SplitsLargeLights || lowResolution == false)
+				RecordFullResolutionPass(renderGraph, resources, msaaSamples, camera, lowResolution ? DrawSet.Small : DrawSet.All);
 
-			if (lowResolution)
-				RecordLowResolutionPasses(renderGraph, resources, cameraData, msaaSamples, DrawSet.Large, FulumaProfiling.DrawLowResolutionName,
-					FulumaProfiling.DrawLowResolutionSampler);
+			if (lowResolution == false)
+				return;
+
+			if (SplitsLargeLights)
+				RecordLowResolutionPasses(renderGraph, resources, cameraData, msaaSamples, DrawSet.Large,
+					FulumaProfiling.DrawLowResolutionName, FulumaProfiling.DrawLowResolutionSampler);
+			else
+				RecordLowResolutionPasses(renderGraph, resources, cameraData, msaaSamples, DrawSet.All, FulumaProfiling.DrawName,
+					FulumaProfiling.DrawSampler);
 		}
 
 		/// <summary>
@@ -130,7 +131,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			_preparedCamera = null;
 			_earlyCamera = null;
 
-			if (_lightBuffer == null || TryPrepareCamera(renderGraph, resources, cameraData, false, out _) == false)
+			if (_lightBuffer == null || TryPrepareCamera(renderGraph, resources, cameraData, false, out var msaaSamples) == false)
 				return;
 
 			_preparedCamera = camera;
@@ -138,10 +139,10 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			if (TryGetPrepassDepth(resources, cameraData, out var prepassDepth, out var isAttachment) == false)
 				return;
 
-			if (SplitsLargeLights && LowResolutionLightsLastFrame(camera) == false)
+			if (RecordsLightBuffer(camera, msaaSamples) == false)
 				return;
 
-			_earlyTargets = RecordLowResolutionDraw(renderGraph, resources, cameraData, prepassDepth,
+			_earlyTargets =RecordLowResolutionDraw(renderGraph, resources, cameraData, prepassDepth,
 				SplitsLargeLights ? DrawSet.Large : DrawSet.All,
 				SplitsLargeLights ? FulumaProfiling.DrawLowResolutionName : FulumaProfiling.DrawName,
 				SplitsLargeLights ? FulumaProfiling.DrawLowResolutionSampler : FulumaProfiling.DrawSampler);
@@ -175,6 +176,24 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			isAttachment = false;
 			depth = forced ? resources.cameraDepthTexture : TextureHandle.nullHandle;
 			return depth.IsValid();
+		}
+
+		/// <summary>
+		/// Whether this camera's recording adds the light buffer's passes. Culling ends after recording, so it follows the
+		/// camera's last culling (<see cref="LightBufferLightsLastFrame"/>): without lights for the buffer there, the
+		/// full-resolution pass draws everything, so a light appearing then is drawn at full resolution for one frame, never
+		/// lost. Without LargeOnly that fallback needs the scene depth at full resolution, so it is taken only when it
+		/// comes without an extra copy (no scene depth, a depth input attachment, or URP's depth texture this pass asks for
+		/// anyway, with MSAA); otherwise the buffer's passes are always recorded.
+		/// </summary>
+		private bool RecordsLightBuffer(Camera camera, int msaaSamples)
+		{
+			if (LightBufferLightsLastFrame(camera))
+				return true;
+
+			var fullResolutionHasDepth = _useSceneDepth == false || _depthAsInputAttachment
+			                             || NeedsCameraDepthTexture(msaaSamples, intermediateDepth: false);
+			return SplitsLargeLights == false && fullResolutionHasDepth == false;
 		}
 
 		/// <summary>

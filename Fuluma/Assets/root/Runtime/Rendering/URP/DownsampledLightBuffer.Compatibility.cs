@@ -40,7 +40,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// Whether <paramref name="depth"/> can be sampled as this camera's scene depth: a render texture (not the
 		/// backbuffer's), single-sampled.
 		/// </summary>
-		private static bool IsSampleable(RTHandle depth) => depth != null && depth.rt != null && depth.rt.antiAliasing <= 1;
+		internal static bool IsSampleable(RTHandle depth) => depth != null && depth.rt != null && depth.rt.antiAliasing <= 1;
 
 		/// <summary>
 		/// A low-resolution target matching the camera target's dimension, slices, XR usage and dynamic resolution, single

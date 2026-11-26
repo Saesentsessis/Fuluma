@@ -78,6 +78,9 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		private const string MissingDepthTextureMessage =
 			"Fake spot lights need URP's depth texture here (no depth input attachment on this platform, or MSAA with a light buffer); enable 'Depth Texture' in the URP asset.";
 
+		private const string UnexpectedBackbufferDepthMessage =
+			"A camera rendered without the intermediate depth texture the light buffer expected (Compatibility Mode); from now on URP's depth texture is requested for every camera. Please report the camera's settings.";
+
 		private const string MissingSpotLightShaderMessage =
 			"The fake spot lights need a spot light shader (Hidden/Fuluma/Analytical/SpotLight); no lights are drawn.";
 
@@ -402,12 +405,25 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		private readonly float _largeLightScreenSize;
 
 		/// <summary>
-		/// Per camera, with <see cref="LightBufferLights.LargeOnly"/>: whether its last culling found lights for the
-		/// downsampled buffer. Culling finishes after the graph is recorded, so this decides whether the next recording
-		/// adds the buffer's passes; when it doesn't, the full-resolution pass draws every light.
+		/// Per camera, with the light buffer: whether its last culling found lights for it (with
+		/// <see cref="LightBufferLights.LargeOnly"/> the large and camera-inside ones, else any visible light). On the
+		/// RenderGraph path culling finishes after the graph is recorded, so this decides whether the next recording adds
+		/// the buffer's passes; when it doesn't, the full-resolution pass draws every light.
 		/// </summary>
-		private readonly System.Collections.Generic.Dictionary<Camera, bool> _lowResolutionLightsLastFrame =
+		private readonly System.Collections.Generic.Dictionary<Camera, bool> _lightBufferLightsLastFrame =
 			new(ReferenceEqualityComparer<Camera>.Instance);
+
+		/// <summary>
+		/// Whether <see cref="ConfigureDepthSource"/> asked URP for <c>_CameraDepthTexture</c> for the current camera.
+		/// </summary>
+		private bool _depthTextureRequested;
+
+		/// <summary>
+		/// Compatibility path: set when a camera's depth attachment turned out unsampleable although
+		/// <see cref="ConfigureDepthSource"/> expected an intermediate one; from then on every camera asks for URP's depth
+		/// texture.
+		/// </summary>
+		private bool _alwaysRequestDepthTexture;
 
 		private bool _warnedMissingDepth;
 		private bool _warnedDroppedLights;
@@ -508,9 +524,9 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			// input attachment where supported.
 			_depthAsInputAttachment = _useSceneDepth && (_lightBuffer == null || SplitsLargeLights)
 			                          && DepthInputAttachmentSupported;
-			ConfigureDepthSource(1);
+			ConfigureDepthSource(1, intermediateDepth: false);
 
-			_mirror = SpotLightGpuMirror.Acquire(store, initialCapacity, initialClipBoxCapacity, dynamicBufferCount);
+			_mirror =SpotLightGpuMirror.Acquire(store, initialCapacity, initialClipBoxCapacity, dynamicBufferCount);
 		}
 
 		/// <summary>
@@ -623,8 +639,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		internal UniversalRendererData RendererData { get; set; }
 
 		/// <summary>
-		/// With <see cref="SplitsLargeLights"/>: whether the last recorded camera got the downsampled buffer's passes (for
-		/// tests).
+		/// Whether the last recorded camera got the downsampled buffer's passes (for tests).
 		/// </summary>
 		internal bool LastRecordedLowResolutionPasses { get; private set; }
 
@@ -838,7 +853,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 				_dynamicLowResolutionMaterials[i] = null;
 			}
 
-			_lowResolutionLightsLastFrame.Clear();
+			_lightBufferLightsLastFrame.Clear();
 		}
 
 		/// <summary>
@@ -848,10 +863,22 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// read; the composite also blends into an intermediate color target. URP's depth texture only where
 		/// <see cref="NeedsCameraDepthTexture"/>.
 		/// </summary>
-		/// <param name="msaaSamples">The camera target's MSAA sample count.</param>
-		internal void ConfigureDepthSource(int msaaSamples)
+		internal void ConfigureDepthSource(ref CameraData cameraData)
 		{
-			ConfigureInput(NeedsCameraDepthTexture(msaaSamples) ? ScriptableRenderPassInput.Depth : ScriptableRenderPassInput.None);
+#if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
+			var intermediateDepth = _compatibilityPath && RendersIntoIntermediateDepth(ref cameraData);
+#else
+			const bool intermediateDepth = false;
+#endif
+			ConfigureDepthSource(cameraData.cameraTargetDescriptor.msaaSamples, intermediateDepth);
+		}
+
+		/// <param name="msaaSamples">The camera target's MSAA sample count.</param>
+		/// <param name="intermediateDepth">See <see cref="NeedsCameraDepthTexture"/>.</param>
+		internal void ConfigureDepthSource(int msaaSamples, bool intermediateDepth)
+		{
+			_depthTextureRequested = NeedsCameraDepthTexture(msaaSamples, intermediateDepth);
+			ConfigureInput(_depthTextureRequested ? ScriptableRenderPassInput.Depth : ScriptableRenderPassInput.None);
 #if UNITY_6000_0_OR_NEWER
 			requiresIntermediateTexture = _depthAsInputAttachment || _lightBuffer != null;
 #endif
@@ -859,13 +886,22 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 
 		/// <summary>
 		/// Whether this camera's draws need URP's <c>_CameraDepthTexture</c>: full-resolution draws without depth input
-		/// attachments, the light buffer with MSAA (its passes read single samples), and every draw in Compatibility Mode.
+		/// attachments, the light buffer with MSAA (its passes read single samples), and on the Compatibility path the
+		/// light buffer unless the camera's depth attachment is an intermediate texture it can sample.
 		/// </summary>
-		private bool NeedsCameraDepthTexture(int msaaSamples)
-			=> _useSceneDepth
-			   && (_compatibilityPath
-			       || (_depthAsInputAttachment == false && (_lightBuffer == null || SplitsLargeLights))
-			       || (_lightBuffer != null && msaaSamples > 1));
+		/// <param name="intermediateDepth">Compatibility path: URP certainly renders this camera into an intermediate depth
+		/// texture, which the light buffer can then sample.</param>
+		private bool NeedsCameraDepthTexture(int msaaSamples, bool intermediateDepth)
+		{
+			if (_useSceneDepth == false)
+				return false;
+
+			var fullResolution = _lightBuffer == null || SplitsLargeLights;
+			if (_compatibilityPath)
+				return fullResolution || msaaSamples > 1 || intermediateDepth == false || _alwaysRequestDepthTexture;
+
+			return (_depthAsInputAttachment == false && fullResolution) || (_lightBuffer != null && msaaSamples > 1);
+		}
 
 		/// <summary>
 		/// Starts preparing a camera, by whichever pass records it first: takes the camera whose culling
@@ -899,7 +935,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// </summary>
 		private bool HasNeededDepthTexture(int msaaSamples, bool cameraDepthTextureExists)
 		{
-			if (NeedsCameraDepthTexture(msaaSamples) == false || cameraDepthTextureExists)
+			if (NeedsCameraDepthTexture(msaaSamples, intermediateDepth: false) == false || cameraDepthTextureExists)
 				return true;
 
 			if (_warnedMissingDepth == false)
@@ -926,15 +962,15 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		}
 
 		/// <summary>
-		/// With <see cref="SplitsLargeLights"/>: whether this camera's last culling had lights for the downsampled buffer
-		/// (a camera not seen yet counts as yes). Bounded: forgets every camera once it has seen many.
+		/// Whether this camera's last culling had lights for the downsampled buffer (a camera not seen yet counts as yes;
+		/// see <see cref="_lightBufferLightsLastFrame"/>). Bounded: forgets every camera once it has seen many.
 		/// </summary>
-		private bool LowResolutionLightsLastFrame(Camera camera)
+		private bool LightBufferLightsLastFrame(Camera camera)
 		{
-			if (_lowResolutionLightsLastFrame.Count > 32)
-				_lowResolutionLightsLastFrame.Clear();
+			if (_lightBufferLightsLastFrame.Count > 32)
+				_lightBufferLightsLastFrame.Clear();
 
-			return _lowResolutionLightsLastFrame.TryGetValue(camera, out var any) == false || any;
+			return _lightBufferLightsLastFrame.TryGetValue(camera, out var any) == false || any;
 		}
 
 		private void CreateMaterialAndProxy(Shader shader, SpotLightProxyArrayDescriptor proxyDescriptor, bool useLods)
@@ -1147,8 +1183,8 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 				WarnOnceIfLightsDropped();
 				RecordDrawStats();
 
-				if (SplitsLargeLights && camera != null)
-					_lowResolutionLightsLastFrame[camera] = _culler.LowResolutionLights > 0;
+				if (_lightBuffer != null && camera != null)
+					_lightBufferLightsLastFrame[camera] = SplitsLargeLights ? _culler.LowResolutionLights > 0 : _culler.Visible > 0;
 
 				if (_culler.Visible > 0)
 				{

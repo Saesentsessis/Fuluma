@@ -54,6 +54,15 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		private static float ClampFinite(float value, float min, float max, float fallback)
 			=> math.isfinite(value) ? math.clamp(value, min, max) : fallback;
 
+		/// <summary>
+		/// A camera rendering into a depth-only texture (shadow or depth captures).
+		/// </summary>
+		private static bool RendersDepthOnly(Camera camera)
+		{
+			var target = camera.targetTexture;
+			return target != null && target.format == RenderTextureFormat.Depth;
+		}
+
 		[Tooltip("When in URP's frame the lights are drawn (default: after the skybox, so the sky doesn't cover the glow). With Light Buffer Timing, part of a downsampled light buffer is recorded after URP's prepasses instead.")]
 		[SerializeField] private RenderPassEvent @event = RenderPassEvent.AfterRenderingSkybox;
 
@@ -651,8 +660,8 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			    || DrawsFor(renderingData.cameraData.camera) == false)
 				return;
 
-			// Before URP sets up its own passes: whether this camera needs URP's depth copy depends on its MSAA.
-			_spotLightRenderPass.ConfigureDepthSource(renderingData.cameraData.cameraTargetDescriptor.msaaSamples);
+			// Before URP sets up its own passes: whether this camera needs URP's depth copy depends on its MSAA and targets.
+			_spotLightRenderPass.ConfigureDepthSource(ref renderingData.cameraData);
 			renderer.EnqueuePass(_spotLightRenderPass);
 
 			if (_spotLightRenderPass.LightBufferBeforeOpaquesPass != null)
@@ -846,8 +855,13 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			return null;
 		}
 
+		/// <summary>
+		/// Cameras the lights are drawn for: not previews, not rendering only into a depth texture (nothing to draw into;
+		/// skipping them here also saves their culling and URP's depth copy), and seeing <see cref="CameraLayers"/>.
+		/// </summary>
 		private bool DrawsFor(Camera camera)
-			=> camera != null && camera.cameraType != CameraType.Preview && (camera.cullingMask & cameraLayers) != 0;
+			=> camera != null && camera.cameraType != CameraType.Preview && (camera.cullingMask & cameraLayers) != 0
+			   && RendersDepthOnly(camera) == false;
 
 #if UNITY_EDITOR
 		/// <summary>

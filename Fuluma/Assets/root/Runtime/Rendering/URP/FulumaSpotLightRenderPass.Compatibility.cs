@@ -4,6 +4,7 @@
 
 #if FULUMA_COMPATIBILITY_PATH
 using Saesentsessis.Fuluma.Profiling;
+using Saesentsessis.Fuluma.Utils;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -30,13 +31,6 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	internal partial class FulumaSpotLightRenderPass
 	{
 		/// <summary>
-		/// A camera rendering into a depth-only target: URP 14 renders it without a fresh <c>_CameraDepthTexture</c>, and
-		/// there is no color to draw into.
-		/// </summary>
-		private static bool RendersDepthOnly(in CameraData cameraData)
-			=> cameraData.targetTexture != null && cameraData.targetTexture.format == RenderTextureFormat.Depth;
-
-		/// <summary>
 		/// Pass data of this path's draws (not pooled: each draw executes before the next is filled).
 		/// </summary>
 		private DrawPassData _compatibilityDrawData;
@@ -45,6 +39,11 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		/// Draws this camera's lights: at full resolution, through the downsampled light buffer, or both (Large Only);
 		/// only the composite when the early pass already drew the buffer.
 		/// </summary>
+		/// <remarks>
+		/// Unlike a render graph recording, <c>Execute</c> fills the command buffer right before it runs, so it waits for
+		/// this camera's culling first and records only what it found: nothing without visible lights, and the light
+		/// buffer's passes (downsample, clear, composite: whole-screen work) only when lights go through it.
+		/// </remarks>
 		public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
 		{
 			ref var cameraData = ref renderingData.cameraData;
@@ -56,40 +55,35 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			_preparedCamera = null;
 			_earlyCamera = null;
 
-			if (RendersDepthOnly(cameraData) || TryPrepareCamera(ref cameraData, prepared, out _) == false)
+			if (TryPrepareCamera(ref cameraData, prepared, out _) == false)
 				return;
 
 			LastRecordedLowResolutionPasses = false;
 			LastRecordedLightBufferBeforeOpaques = early;
 
+			// The early pass only draws the buffer when there are lights for it, so it always needs its composite.
+			var culler = FinishCulling(camera);
+			if (culler == null && early == false)
+				return;
+
+			// Large Only: small lights at full resolution, large and camera-inside lights through the buffer.
+			var bufferLights = _lightBuffer != null && (early || SplitsLargeLights == false || culler.LowResolutionLights > 0);
+			if (bufferLights && early == false && CanSampleSceneDepth(ref cameraData) == false)
+				return;
+
 			var cmd = CommandBufferPool.Get();
-			if (_lightBuffer == null)
-				DrawFullResolution(cmd, camera, DrawSet.All);
-			else if (early)
-			{
-				// The buffer is drawn already; small lights (LargeOnly) at full resolution, then the composite.
-				if (SplitsLargeLights)
-				{
-					DrawFullResolution(cmd, camera, DrawSet.Small);
-					LastRecordedLowResolutionPasses = true;
-				}
+			if (_lightBuffer == null || SplitsLargeLights)
+				DrawFullResolution(cmd, camera, bufferLights ? DrawSet.Small : DrawSet.All);
 
+			if (early)
 				CompositeLightBuffer(cmd, ref cameraData);
-			}
-			else if (SplitsLargeLights == false)
-				DrawThroughLightBuffer(cmd, ref cameraData, DrawSet.All, FulumaProfiling.DrawSampler);
-			else
+			else if (bufferLights)
 			{
-				// LargeOnly: small lights at full resolution; large and camera-inside lights through the downsampled
-				// buffer, unless the last culling of this camera found none (then the full-resolution draw has them all).
-				var lowResolution = LowResolutionLightsLastFrame(camera);
-				LastRecordedLowResolutionPasses = lowResolution;
-
-				DrawFullResolution(cmd, camera, lowResolution ? DrawSet.Small : DrawSet.All);
-				if (lowResolution)
-					DrawThroughLightBuffer(cmd, ref cameraData, DrawSet.Large, FulumaProfiling.DrawLowResolutionSampler);
+				DrawThroughLightBuffer(cmd, ref cameraData, SplitsLargeLights ? DrawSet.Large : DrawSet.All,
+					SplitsLargeLights ? FulumaProfiling.DrawLowResolutionSampler : FulumaProfiling.DrawSampler);
 			}
 
+			LastRecordedLowResolutionPasses = bufferLights;
 			context.ExecuteCommandBuffer(cmd);
 			CommandBufferPool.Release(cmd);
 		}
@@ -108,7 +102,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			_preparedCamera = null;
 			_earlyCamera = null;
 
-			if (_lightBuffer == null || RendersDepthOnly(cameraData) || TryPrepareCamera(ref cameraData, false, out _) == false)
+			if (_lightBuffer == null || TryPrepareCamera(ref cameraData, false, out _) == false)
 				return;
 
 			_preparedCamera = camera;
@@ -116,7 +110,9 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			if (TryGetPrepassDepth(ref cameraData, out var prepassDepth, out var isAttachment) == false)
 				return;
 
-			if (SplitsLargeLights && LowResolutionLightsLastFrame(camera) == false)
+			// Only with lights for the buffer (see Execute); otherwise the main pass draws whatever is visible.
+			var culler = FinishCulling(camera);
+			if (culler == null || (SplitsLargeLights && culler.LowResolutionLights == 0))
 				return;
 
 			var cmd = CommandBufferPool.Get();
@@ -171,6 +167,43 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			FinishPreparingCamera(msaaSamples, cameraData.camera, culledCamera, cameraData.GetViewMatrix(),
 				cameraData.GetProjectionMatrix(), cameraData.worldSpaceCameraPos);
 			return true;
+		}
+
+		/// <summary>
+		/// Whether URP certainly renders this camera into an intermediate depth texture, which the light buffer samples
+		/// itself (single-sampled) instead of URP's depth copy. In URP's Compatibility Mode setup (URP 14 and 17) a base
+		/// camera with an intermediate color target always gets an intermediate depth too; only conditions that force the
+		/// intermediate color are trusted: this pass's <c>requiresIntermediateTexture</c> (URP 17, with the light buffer), or
+		/// on URP 14 HDR or the opaque texture. Scene view cameras (their filtering mode can draw straight to the view) and
+		/// cameras with a target texture are left to URP's depth copy.
+		/// </summary>
+		private bool RendersIntoIntermediateDepth(ref CameraData cameraData)
+		{
+			if (cameraData.renderType != CameraRenderType.Base || cameraData.isSceneViewCamera || cameraData.targetTexture != null)
+				return false;
+
+#if UNITY_6000_0_OR_NEWER
+			return _lightBuffer != null;
+#else
+			return cameraData.isHdrEnabled || cameraData.requiresOpaqueTexture;
+#endif
+		}
+
+		/// <summary>
+		/// Whether the light buffer can read this camera's scene depth: always when it doesn't use any or URP makes its
+		/// depth texture for this camera, else only from a depth attachment it can sample. When
+		/// <see cref="ConfigureDepthSource"/> wrongly expected one, every later camera asks URP for the depth texture and
+		/// this camera's buffer is skipped, once.
+		/// </summary>
+		private bool CanSampleSceneDepth(ref CameraData cameraData)
+		{
+			if (_useSceneDepth == false || _depthTextureRequested
+			    || DownsampledLightBuffer.IsSampleable(cameraData.renderer.cameraDepthTargetHandle))
+				return true;
+
+			_alwaysRequestDepthTexture = true;
+			Debug.LogWarning(StringUtils.PrependFulumaPrefix(UnexpectedBackbufferDepthMessage));
+			return false;
 		}
 
 		/// <summary>

@@ -3,6 +3,9 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+#if UNITY_6000_5_OR_NEWER
+using Unity.Scripting.LifecycleManagement;
+#endif
 
 namespace Saesentsessis.Fuluma.Rendering.URP
 {
@@ -20,8 +23,17 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 	/// can't judge (deferred rendering, the Scene view) answer "no prepass": the buffer is then drawn after the opaques,
 	/// which is always correct.
 	/// </summary>
+#if UNITY_6000_5_OR_NEWER
+	// The device's capabilities, queried once: they don't change while the process runs.
+	[NoAutoStaticsCleanup]
+#endif
 	internal static class UrpDepthPrepass
 	{
+		/// <summary>
+		/// What URP's rules ask of the device (<see cref="QueryDevice"/>); <see cref="DeviceFlags.None"/> until queried.
+		/// </summary>
+		private static DeviceFlags s_deviceFlags;
+
 #if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
 		/// <summary>
 		/// Compatibility Mode (URP 14, and URP 17's <c>UniversalRenderer.Setup</c>): where the depth a full depth prepass
@@ -129,14 +141,10 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			if (needsDepth && canCopyDepth == false)
 				return false;
 
-			var webGl = Application.platform == RuntimePlatform.WebGLPlayer;
-#if UNITY_6000_0_OR_NEWER
-			webGl |= SystemInfo.graphicsDeviceType == GraphicsDeviceType.WebGPU;
-#endif
 			var firstToWriteDepth = camera.RenderType == CameraRenderType.Base || camera.ClearDepth;
 			var offscreenDepth = camera.TargetTexture != null && camera.TargetTexture.format == RenderTextureFormat.Depth;
 
-			return webGl == false && firstToWriteDepth && offscreenDepth == false && camera.MsaaSamples == 1;
+			return IsWebGl() == false && firstToWriteDepth && offscreenDepth == false && camera.MsaaSamples == 1;
 		}
 
 #if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
@@ -152,7 +160,6 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			if (requested == false || canCopyDepth == false)
 				return false;
 
-			var webGl = Application.platform == RuntimePlatform.WebGLPlayer;
 			var firstToWriteDepth = camera.RenderType == CameraRenderType.Base || camera.ClearDepth;
 			var offscreenDepth = camera.TargetTexture != null && camera.TargetTexture.format == RenderTextureFormat.Depth;
 #if UNITY_6000_0_OR_NEWER
@@ -160,7 +167,7 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 			if (camera.MsaaSamples > 1)
 				return false;
 #endif
-			return webGl == false && firstToWriteDepth && offscreenDepth == false && camera.IsReflection == false;
+			return IsWebGl() == false && firstToWriteDepth && offscreenDepth == false && camera.IsReflection == false;
 		}
 
 		private static bool IsDeferredPlus(UniversalRendererData data)
@@ -178,18 +185,46 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 #endif
 #endif
 
+		/// <summary>
+		/// Whether URP can copy the camera's depth (URP's <c>CanCopyDepth</c>): single-sampled, the depth format or texture
+		/// copies; with MSAA, a depth resolve (not on OpenGL ES 3).
+		/// </summary>
 		private static bool CanCopyDepth(int msaaSamples)
 		{
-			var msaa = msaaSamples > 1;
-			var supportsDepthCopy = msaa == false
-			                        && (SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.Depth)
-			                            || SystemInfo.copyTextureSupport != CopyTextureSupport.None);
-			var msaaDepthResolve = msaa && SystemInfo.supportsMultisampledTextures != 0;
+			if (s_deviceFlags == DeviceFlags.None)
+				s_deviceFlags = QueryDevice();
 
-			if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3 && msaaDepthResolve)
-				return false;
+			return (s_deviceFlags & (msaaSamples > 1 ? DeviceFlags.CopiesMsaaDepth : DeviceFlags.CopiesDepth)) != 0;
+		}
 
-			return supportsDepthCopy || msaaDepthResolve;
+		/// <summary>
+		/// Whether this device runs WebGL or WebGPU, where URP never primes depth.
+		/// </summary>
+		private static bool IsWebGl()
+		{
+			if (s_deviceFlags == DeviceFlags.None)
+				s_deviceFlags = QueryDevice();
+
+			return (s_deviceFlags & DeviceFlags.WebGl) != 0;
+		}
+
+		private static DeviceFlags QueryDevice()
+		{
+			var flags = DeviceFlags.Queried;
+			if (SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.Depth) || SystemInfo.copyTextureSupport != CopyTextureSupport.None)
+				flags |= DeviceFlags.CopiesDepth;
+
+			if (SystemInfo.supportsMultisampledTextures != 0 && SystemInfo.graphicsDeviceType != GraphicsDeviceType.OpenGLES3)
+				flags |= DeviceFlags.CopiesMsaaDepth;
+
+			var webGl = Application.platform == RuntimePlatform.WebGLPlayer;
+#if UNITY_6000_0_OR_NEWER
+			webGl |= SystemInfo.graphicsDeviceType == GraphicsDeviceType.WebGPU;
+#endif
+			if (webGl)
+				flags |= DeviceFlags.WebGl;
+
+			return flags;
 		}
 
 		/// <summary>
@@ -264,6 +299,16 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 				ClearDepth = 1 << 3,
 				Reflection = 1 << 4
 			}
+		}
+
+		[System.Flags]
+		private enum DeviceFlags : byte
+		{
+			None = 0,
+			Queried = 1 << 0,
+			CopiesDepth = 1 << 1,
+			CopiesMsaaDepth = 1 << 2,
+			WebGl = 1 << 3
 		}
 
 #if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)

@@ -32,6 +32,7 @@ The old path is called the **compatibility path** below, whichever Unity version
 | 5. Compatibility path, early pass | Done, `5c65f17` |
 | 6. Test projects (URP asset with the feature in all four), CI matrix | Done |
 | Backbuffer depth load (URP, RenderGraph): RenderGraph's extra fragment threads explained | Done, see "Cost on phones" |
+| Efficiency fixes: no light buffer without lights, no needless depth copy, depth-only cameras, cached device queries | Done, see "Efficiency fixes" |
 | Composite merge experiment (RenderGraph) | Kept on branch `dev/urp_compatibility_mode_composite_merge` (`5ba5116`), not merged (user's choice): it removes RenderGraph's extra LargeOnly reload but not its cost; see "Cost on phones" |
 | 7. Release 0.2.0: installer, docs, CHANGELOG | |
 | Profiling project on 2022.3 (git-ignored), players, phone measurements | After the suite passes on 2022.3 and 6000.0 |
@@ -153,6 +154,50 @@ player per mode) and the dev project (6000.7.0b4). No throttling (thermal status
   shows a 12.3 ms downsample on Compatibility and 1.1 ms on RenderGraph): use the counters.
 - Straight-to-screen cameras on the compatibility path needed the composite flip (fixed in `046aff2`, verified on the
   15C with HDR and scene depth off).
+
+## Efficiency fixes (2026-11-26)
+
+From a review of the branch's code (no per-frame managed allocations found):
+
+1. **No light buffer without lights.** The downsample, clear and composite are whole-screen work, and were recorded
+   whether or not the camera saw a light.
+   - Compatibility path: `Execute` fills its command buffer right before it runs, so it now finishes the camera's culling
+     first and records only what it found. LargeOnly decides from this frame's culling (was the previous frame's).
+   - RenderGraph: recording precedes culling, so the previous frame decides, as LargeOnly already did. Without
+     LargeOnly the full-resolution pass stands in only where it has scene depth without an extra copy (no scene depth,
+     depth input attachment, or the depth texture already requested for MSAA). Elsewhere the buffer is still recorded:
+     on 6000.0-6000.5 a stand-in would need URP's depth copy, which costs as much as it saves.
+2. **No depth copy for the Compatibility light buffer when it can sample the depth attachment.** Requested only for
+   full-resolution draws, MSAA, or cameras not certain to render into an intermediate depth texture. Certain: base
+   cameras without a target texture, outside the Scene view, with URP 17's `requiresIntermediateTexture` (set with the
+   light buffer) or, on URP 14, HDR or the opaque texture. A wrong guess (the attachment turns out unsampleable) skips
+   that camera's buffer once, warns, and requests the copy from then on.
+3. Depth-only cameras (target texture in a depth format) get neither culling nor the pass.
+4. `UrpDepthPrepass` queries the device's capabilities once, not per camera.
+
+Measured on the phones (6000.0, the stress setup above, two rounds, spread under 0.6%): the Compatibility player with
+the fixes against the same player built from the commit before them. GPU active cycles per frame, millions:
+
+| | 11T before | 11T after | 15C before | 15C after |
+|---|---|---|---|---|
+| Camera sees no light (lights in the store) | 1.96 | **0.89** (-55%) | 5.93 | **2.73** (-54%) |
+| Light buffer 0.5, all lights | 6.14 | **5.82** (-5.3%) | 27.82 | **27.26** (-2.0%) |
+| Light buffer 0.5, LargeOnly | 10.02 | 9.99 | 46.98 | 47.01 |
+| Full resolution | 16.04 | 16.03 | 79.70 | 79.89 |
+
+- The light buffer run's saving is URP's depth copy: 2.6 M fewer fragment threads on the 11T. With it, Compatibility
+  is now cheaper than RenderGraph there (6.24 / 27.98 M cycles), which still pays URP's backbuffer depth load.
+- 2022.3 against the 2026-11-25 runs (other day, same player setup): light buffer 0.5 5.67 -> 5.34 (11T) and
+  26.47 -> 25.89 (15C); full resolution and LargeOnly unchanged.
+- Render thread per frame (11T): no light 1.02 -> 0.66 ms, light buffer 1.14 -> 1.04 ms.
+- Screenshots match the earlier player's to 0.1% of lit pixels.
+
+**Cameras of different sizes (the shared light buffer targets, decision 4).** 2, 4 and 8 split-screen cameras, all the
+same size or every other one 8 pixels narrower, so the Compatibility path reallocates its three targets at every camera
+switch (`-fulumaCameras`, `-fulumaCameraSizes` in `Fuluma6000`). No measurable penalty on either phone: mixed and same
+sizes agree within the runs' spread in GPU cycles (11T 6.46/6.46, 9.15/9.17, 12.55/12.60 M; 15C 27.06/27.11,
+35.54/35.58, 37.63/37.67 M) and render-thread time (at most +0.06 ms with 8 cameras, within noise). URP's own
+per-camera reallocation (full resolution, control) shows nothing either. The shared set stays.
 
 ## Compatibility Mode by version
 
@@ -323,7 +368,8 @@ switching targets inside `Execute` is legal; the cost is that Fuluma always brea
 ## Risks and unknowns
 
 - **Several cameras of different sizes** (Scene view + Game view, split screen) reallocate the light buffer's RTHandles
-  every camera with one shared set (decision 4).
+  every camera with one shared set (decision 4). Measured on phones with up to 8 cameras: no measurable cost (see
+  "Efficiency fixes").
 - **Auto timing on URP 14:** porting the prepass rules may miss cases; the early pass then silently doesn't run. The
   image stays correct and only the saving is lost.
 - **Untested compiled code:** on 6.0–6.3 the compatibility path compiles but most users never run it; only the
