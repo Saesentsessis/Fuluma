@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Saesentsessis.Fuluma.Core;
+using Saesentsessis.Fuluma.Editor.Core;
 using Saesentsessis.Fuluma.Rendering.URP;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -19,8 +20,9 @@ namespace Saesentsessis.Fuluma.Editor.Components
 	/// level (a level without its own pipeline asset uses the default one).
 	/// </summary>
 	/// <remarks>
-	/// Reads URP's public renderer list and each renderer's feature list; no reflection. Stores are compared by the
-	/// serialized override store (null = <see cref="LightStore.Default"/>), so the lookup never creates the default store.
+	/// Reads URP's public renderer list (URP 14 has none, so there the pipeline asset's serialized list) and each
+	/// renderer's feature list; no reflection. Stores are compared by the serialized override store (null =
+	/// <see cref="LightStore.Default"/>), so the lookup never creates the default store.
 	/// </remarks>
 	internal static class StoreFeatureLookup
 	{
@@ -76,7 +78,7 @@ namespace Saesentsessis.Fuluma.Editor.Components
 			{
 				result.AnyUniversalPipeline = true;
 
-				foreach (var renderer in universal.rendererDataList)
+				foreach (var renderer in UrpRendererDataList.Of(universal))
 				{
 					if (renderer != null)
 						draws |= ScanRenderer(renderer, overrideStore, result);

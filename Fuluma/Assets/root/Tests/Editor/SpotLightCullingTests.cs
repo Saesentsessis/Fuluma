@@ -261,6 +261,60 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 			Assert.AreEqual(12, _culler.Dropped);
 		}
 
+		/// <summary>
+		/// Lights that emit nothing (zero intensity, zero alpha or a black color) are never visible, however they move:
+		/// one at a time, in a batch, or as a dynamic light following its Transform. Giving one light back to them makes it
+		/// visible again.
+		/// </summary>
+		[Test]
+		public void Culling_SkipsLightsThatEmitNothing()
+		{
+			_camera.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+			Placement Ahead(float z) => new() { Position = new Vector3(0f, 0f, z), Rotation = Quaternion.identity };
+
+			var zeroIntensity = SpotLightData.Default;
+			zeroIntensity.Intensity = 0f;
+			var zeroAlpha = SpotLightData.Default;
+			zeroAlpha.Color = new Color32(255, 255, 255, 0);
+			var black = SpotLightData.Default;
+			black.Color = new Color32(0, 0, 0, 255);
+
+			_store.AddSpotLight(Ahead(10f), SpotLightData.Default);
+			var dark = _store.AddSpotLight(Ahead(12f), zeroIntensity);
+			_store.AddSpotLight(Ahead(14f), zeroAlpha);
+			var blackLight = _store.AddSpotLight(Ahead(16f), black);
+
+			var lamp = new GameObject("Fuluma Culling Test Dark Lamp") { hideFlags = HideFlags.HideAndDontSave };
+			try
+			{
+				lamp.transform.SetPositionAndRotation(new Vector3(0f, 0f, 18f), Quaternion.identity);
+				_store.AddSpotLight(lamp.transform, zeroIntensity);
+
+				Cull();
+				Assert.AreEqual(1, _culler.Visible, "Only the light that emits is visible.");
+
+				// Moved one at a time, in a batch job, and as a dynamic light: still dark.
+				_store.SetSpotLightPlacement(dark, Ahead(20f));
+				using (var handles = new Unity.Collections.NativeArray<LightHandle>(new[] { blackLight }, Unity.Collections.Allocator.TempJob))
+				using (var placements = new Unity.Collections.NativeArray<Placement>(new[] { Ahead(22f) }, Unity.Collections.Allocator.TempJob))
+					Assert.AreEqual(1, _store.SetSpotLightPlacements(handles, placements));
+
+				lamp.transform.position = new Vector3(0f, 0f, 24f);
+				_store.ScheduleDynamicSpotLightSync().Complete();
+
+				Cull();
+				Assert.AreEqual(1, _culler.Visible, "Moving dark lights keeps them culled.");
+
+				_store.SetSpotLight(dark, SpotLightData.Default);
+				Cull();
+				Assert.AreEqual(2, _culler.Visible, "A light given back its intensity is visible again.");
+			}
+			finally
+			{
+				Object.DestroyImmediate(lamp);
+			}
+		}
+
 		[Test]
 		public void Culling_FollowsMovedAndRemovedLights()
 		{

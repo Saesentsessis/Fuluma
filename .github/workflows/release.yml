@@ -18,7 +18,7 @@ concurrency:
 
 env:
   # The package's minimum Unity version (package.json "unity": "6000.3"); the Installer project is saved with it.
-  INSTALLER_UNITY_VERSION: 6000.3.1f1
+  INSTALLER_UNITY_VERSION: 2022.3.62f3
 
 jobs:
   check-version-tag:
@@ -294,6 +294,11 @@ jobs:
       fail-fast: false
       matrix:
         config:
+          # The minimum (Compatibility path), the Unity 6 RenderGraph floor, and the current versions.
+          - unityVersion: "2022.3.62f3"
+            projectPath: "./Unity-Tests/2022.3.62f3"
+          - unityVersion: "6000.0.85f2"
+            projectPath: "./Unity-Tests/6000.0.85f2"
           - unityVersion: "6000.3.1f1"
             projectPath: "./Unity-Tests/6000.3.1f1"
           - unityVersion: "6000.6.1f1"

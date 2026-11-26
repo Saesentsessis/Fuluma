@@ -11,6 +11,12 @@ namespace Saesentsessis.Fuluma.Data
 	/// <remarks>
 	/// Kept by each pool next to its packed data, index-aligned, with a bounding sphere in a separate list (see
 	/// <c>SpotLightPool</c>) so the first culling pass streams 16 B per light.
+	/// <para>
+	/// A light that emits nothing (zero intensity, zero alpha or a black color) keeps a negative range here
+	/// (<see cref="CullingRange"/>). Its bounding sphere then has radius <see cref="DarkRadius"/>, which every frustum
+	/// plane test rejects, so culling skips it without a test of its own; moving the light keeps that, reshaping it
+	/// recomputes it. Both markers are finite: the jobs compile with fast math, which assumes no infinities.
+	/// </para>
 	/// </remarks>
 	[StructLayout(LayoutKind.Sequential, Size = Size)]
 	internal struct SpotLightCullingData
@@ -21,6 +27,17 @@ namespace Saesentsessis.Fuluma.Data
 		public const int Size = 32;
 
 		/// <summary>
+		/// Bounding sphere radius of a light that emits nothing: farther below zero than any plane distance, so every
+		/// frustum plane test (<c>distance &lt; -radius</c>) rejects it; its square still fits a float.
+		/// </summary>
+		public const float DarkRadius = -1e18f;
+
+		/// <summary>
+		/// Range kept for a light that emits nothing (any negative range marks it).
+		/// </summary>
+		private const float DarkRange = -1f;
+
+		/// <summary>
 		/// Light axis of a rotation: its forward (+z), as the GPU decodes it.
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -29,6 +46,20 @@ namespace Saesentsessis.Fuluma.Data
 		/// <inheritdoc cref="Direction(quaternion)"/>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static float3 Direction(Quaternion rotation) => Direction((quaternion)rotation);
+
+		/// <summary>
+		/// Whether <paramref name="light"/> adds any light: radiance is rgb × intensity × alpha.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static bool Emits(in PackedSpotLightData light)
+			=> (float)light.Intensity > 0f && (light.PackedColor & 0xFF000000u) != 0u && (light.PackedColor & 0x00FFFFFFu) != 0u;
+
+		/// <summary>
+		/// The range culling keeps for <paramref name="light"/>: its own, or a negative one when it emits nothing (see
+		/// remarks).
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static float CullingRange(in PackedSpotLightData light) => Emits(light) ? light.Range : DarkRange;
 
 		/// <summary>
 		/// Apex (xyz) and range (w).
@@ -56,14 +87,20 @@ namespace Saesentsessis.Fuluma.Data
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal SpotLightCullingData(in Placement placement, in PackedSpotLightData light)
-			: this(placement.Position, Direction(placement.Rotation), light.Range, light.CosOuter)
+			: this(placement.Position, Direction(placement.Rotation), CullingRange(light), light.CosOuter)
 		{
 		}
 
 		/// <summary>
+		/// Whether this light emits nothing, so culling skips it (see remarks).
+		/// </summary>
+		public readonly bool IsDark => PositionRange.w < 0f;
+
+		/// <summary>
 		/// Smallest sphere around the light's volume: a cone of the outer half-angle capped by the range sphere.
 		/// </summary>
-		/// <returns>Center (xyz) and radius (w).</returns>
+		/// <returns>Center (xyz) and radius (w); radius <see cref="DarkRadius"/> for a light that emits nothing
+		/// (<see cref="IsDark"/>).</returns>
 		/// <remarks>
 		/// From 45 degrees up, the sphere through the cap's rim circle also holds the apex: center at the rim's height,
 		/// radius the rim radius. Narrower cones need the sphere through apex and rim: center at r / (2 cos), radius the
@@ -76,6 +113,9 @@ namespace Saesentsessis.Fuluma.Data
 			var range = PositionRange.w;
 			var direction = DirectionCosOuter.xyz;
 			var cosOuter = DirectionCosOuter.w;
+
+			if (IsDark)
+				return new float4(position, DarkRadius);
 
 			if (cosOuter <= math.SQRT2 * 0.5f)
 			{
@@ -98,12 +138,13 @@ namespace Saesentsessis.Fuluma.Data
 		}
 
 		/// <summary>
-		/// Reshapes the light: the range and cone of <paramref name="light"/>, the same apex and axis.
+		/// Reshapes the light: the range and cone of <paramref name="light"/> (a negative range if it emits nothing), the
+		/// same apex and axis.
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal void Reshape(in PackedSpotLightData light)
 		{
-			PositionRange.w = light.Range;
+			PositionRange.w = CullingRange(light);
 			DirectionCosOuter.w = light.CosOuter;
 		}
 	}

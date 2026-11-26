@@ -12,12 +12,14 @@ downsampled light buffer.
 Add it to a Universal Renderer (**Add Renderer Feature > Fuluma Render Feature**). Every frame, for every camera
 that draws it, the feature culls the lights of its store on worker threads, picks a proxy LOD per light, and draws
 them additively with an analytical shader, straight onto the camera or into a downsampled light buffer that is then
-upscaled.
+upscaled. It works with URP's RenderGraph and in URP's Compatibility Mode (see
+[Render paths](#render-paths)).
 
 - **One store per feature.** The feature draws its **Override Store**, or the default store when that is empty.
   Lights in another store need a feature of their own. See
   [Light Stores & Cameras](../README.md#light-stores--cameras).
-- **Camera filter.** A camera draws the lights only if its culling mask includes one of **Camera Layers**.
+- **Camera filter.** A camera draws the lights only if its culling mask includes one of **Camera Layers**. Preview
+  cameras and cameras rendering into a depth-only texture never draw them.
 - **Pass event.** The default, **After Rendering Skybox**, is recommended: the lights read the scene depth the
   opaques leave behind, glow in front of the sky, and transparent objects drawn afterwards blend over the glow behind
   them. **After Rendering Opaques** is fine where no sky shows: URP draws the skybox after it, over any glow in front
@@ -37,7 +39,7 @@ upscaled.
 |-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|-----------------|--------------------|
 | Override Store  | The store whose lights this feature draws. Empty: the default store, where components register unless they name a store of their own.             | None (default store) | Any Light Store | Recreates the pass |
 | Camera Layers   | Cameras draw the lights only if their culling mask includes one of these layers, as if the lights lived on them. Preview cameras never draw them. | Everything           | Any layer mask  | Immediate          |
-| Light Intensity | Global multiplier on the brightness of every fake light the feature draws, whatever its type.                                                     | 1                    | ≥ 0             | Immediate          |
+| Light Intensity | Global multiplier on the brightness of every fake light the feature draws, whatever its type. 0 skips the feature: no culling, no passes.         | 1                    | ≥ 0             | Immediate          |
 
 **Scattering**
 
@@ -87,7 +89,7 @@ Each option is its own shader variant; see [Scattering](../README.md#scattering)
 | Light Buffer Lights     | All: the buffer shades every light. Large Only: only lights at least Large Light Screen Size on screen, and lights the camera is inside of; smaller lights draw at full resolution (one more pass; consider All on tile-based mobile GPUs).                                          | All                  | All, Large Only                     | Recreates the pass                                                              |
 | Large Light Screen Size | With Large Only: a light's bounding-sphere diameter, as a fraction of the screen height, from which it is shaded in the buffer.                                                                                                                                                      | 0.15                 | 0.01 to 1                           | Recreates the pass                                                              |
 | Light Buffer Upsample   | Depth Aware keeps glow from bleeding over nearer geometry (3 texture reads per pixel, 6 at depth edges); Bilinear is the cheapest (1).                                                                                                                                               | Depth Aware          | Depth Aware, Bilinear               | Recreates the pass                                                              |
-| Light Buffer Timing     | When a downsampled buffer is shaded: Before Opaques (from URP's depth prepass), After Opaques, or Auto (before only when the renderer's settings already make URP render a depth prepass).                                                                                           | Auto                 | Auto, After Opaques, Before Opaques | Immediate                                                                       |
+| Light Buffer Timing     | When a downsampled buffer is shaded: Before Opaques (from URP's depth prepass), After Opaques, or Auto (before only when the renderer's settings already make URP render a depth prepass; in Compatibility Mode by URP's rules for that mode).                                       | Auto                 | Auto, After Opaques, Before Opaques | Immediate                                                                       |
 | Light Buffer Shader     | `Hidden/Fuluma/LightBuffer`, filled in by the Editor when empty so builds include it. Used only with a downsampled buffer.                                                                                                                                                           | The package's shader | Shader                              | Recreates the pass                                                              |
 
 ## Scripting
@@ -131,11 +133,47 @@ public static void DrawStore(UniversalRendererData rendererData, LightStore leve
   options and most fidelity features) and are changed from scripts at runtime need those variants kept: list the
   setups in a shader variant collection on Project Settings > Fuluma, or use Custom mode there. Light Buffer Scale is
   safe to change at runtime.
-- **RenderGraph only.** URP's Compatibility Mode isn't supported, so the feature draws nothing there. Compatibility
-  Mode support is planned.
 - **Max Spot Lights.** Visible lights past the limit are skipped, with a warning logged once.
-- **Preview cameras** (inspector and asset previews) never draw fake lights.
+- **Lights that emit nothing** (intensity 0, color alpha 0, or a black color) are skipped by culling at no extra
+  cost, so dimming a light to 0 removes its draw too. With **Light Intensity** at 0 the whole feature does nothing.
+- **Preview cameras** (inspector and asset previews) and cameras rendering into a depth-only texture never draw fake
+  lights.
+- **No lights, no buffer.** A downsampled buffer's passes (depth downsample, clear, composite) are whole-screen work,
+  so a camera that sees no lights skips them. In Compatibility Mode the frame's own culling decides. With RenderGraph
+  the frame is recorded before culling ends, so the camera's previous frame decides: with Large Only, a frame after one
+  without large lights draws everything at full resolution; with All, the same happens only where full-resolution
+  drawing reads the depth input attachment (Unity 6.6 and newer), and elsewhere the buffer's passes always run. A light
+  appearing in such a frame is drawn at full resolution for that frame, never lost.
 - **Deferred paths.** With Light Buffer Timing on Auto, Deferred and Deferred+ never use a prepass, so the buffer is
   shaded after the opaques there.
 - **Pass rebuilds.** Settings marked "Recreates the pass" rebuild the materials and proxy mesh, so change them on
   events such as a settings menu, not every frame.
+
+## Render paths
+
+URP runs renderer features through its RenderGraph or, where it still has it, through Compatibility Mode. The feature
+supports both and draws the same picture.
+
+| Unity             | URP          | RenderGraph | Compatibility Mode                                              |
+|-------------------|--------------|-------------|-----------------------------------------------------------------|
+| 2022.3            | 14           | No          | Always                                                          |
+| 6000.0 to 6000.2  | 17.0 to 17.2 | Yes         | When enabled in Project Settings > Graphics (deprecated by URP) |
+| 6000.3            | 17.3         | Yes         | When enabled, with Unity's `URP_COMPATIBILITY_MODE` define      |
+| 6000.4 and newer  | 17.4 and up  | Yes         | No (removed from URP)                                           |
+
+The pass reads the mode when it is created; switching it recreates URP's pipeline, and with it the pass.
+
+Differences in Compatibility Mode:
+
+- **Scene depth at full resolution** comes from URP's depth texture: there are no depth input attachments, so URP
+  adds a depth copy (requested by the feature itself; nothing to enable). A downsampled buffer reads the camera's
+  depth attachment directly where the camera certainly renders into an intermediate depth texture (HDR on, the
+  default, or the opaque texture), and URP's depth texture otherwise.
+- **Render pass merging** on tile-based GPUs: on Unity 2022.3, URP turns its native render passes off for a camera
+  that runs any third-party feature. The 2-7% that Before Opaques timing saves with RenderGraph by keeping URP's
+  passes merged hasn't been measured in Compatibility Mode.
+- **Several cameras** of different sizes share one set of light buffer textures, reallocated when the size changes
+  (measured with up to 8 split-screen cameras on two phones: no measurable cost).
+
+With RenderGraph, depth input attachments (full-resolution draws reading the depth from tile memory) need Unity 6.6 or
+newer and a graphics API that supports them; Deferred+ needs Unity 6.1 or newer.

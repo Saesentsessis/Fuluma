@@ -1,6 +1,20 @@
+#if UNITY_6000_0_OR_NEWER
+#define FULUMA_RENDER_GRAPH
+#endif
+#if !UNITY_6000_3_OR_NEWER || (URP_COMPATIBILITY_MODE && !UNITY_6000_4_OR_NEWER)
+#define FULUMA_COMPATIBILITY_PATH
+#endif
+
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
+#if FULUMA_RENDER_GRAPH
+using UnityEngine.Rendering.RenderGraphModule;
+#endif
+
+#if FULUMA_COMPATIBILITY_PATH
+// URP 17 (Unity 6.0-6.3) marks the Compatibility Mode members obsolete; URP 14 (2022.3) has no other path.
+#pragma warning disable 618, 672
+#endif
 
 namespace Saesentsessis.Fuluma.Rendering.URP
 {
@@ -28,7 +42,14 @@ namespace Saesentsessis.Fuluma.Rendering.URP
 		public void RequestDepthPrepass(bool request)
 			=> ConfigureInput(request ? ScriptableRenderPassInput.Depth : ScriptableRenderPassInput.None);
 
+#if FULUMA_RENDER_GRAPH
 		public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
 			=> _owner.RecordLightBufferBeforeOpaques(renderGraph, frameData);
+#endif
+
+#if FULUMA_COMPATIBILITY_PATH
+		public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+			=> _owner.ExecuteLightBufferBeforeOpaques(context, ref renderingData);
+#endif
 	}
 }

@@ -654,6 +654,12 @@ namespace Saesentsessis.Fuluma.Tests
 		/// </summary>
 		private static FulumaRenderFeature FindFeature()
 		{
+#if !UNITY_6000_0_OR_NEWER
+			// URP 14 has no public renderer list (the Fuluma2022 profiling project); a feature is loaded with its renderer.
+			foreach (var fuluma in Resources.FindObjectsOfTypeAll<FulumaRenderFeature>())
+				if (fuluma.isActive)
+					return fuluma;
+#else
 			if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset asset)
 				foreach (var rendererData in asset.rendererDataList)
 				{
@@ -664,6 +670,7 @@ namespace Saesentsessis.Fuluma.Tests
 						if (feature is FulumaRenderFeature { isActive: true } fuluma)
 							return fuluma;
 				}
+#endif
 
 			return null;
 		}

@@ -47,10 +47,11 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 		}
 
 		// Custom mode keeping everything counts every variant of every pass: the near fade group only exists in the inside
-		// pass (960 + 480 for the spot light shader, not 2 x 960), the checkerboard only in the downsample pass (2 + 1 + 1).
-		// Keeping one value per group keeps exactly one variant per pass.
+		// pass (960 + 480 for the spot light shader, not 2 x 960), the checkerboard only in the downsample pass and the
+		// camera depth texture in the downsample and depth-aware composite passes (2 x 2 + 1 + 2). Keeping one value per
+		// group keeps exactly one variant per pass.
 		[TestCase("spotLight", 1440, 2)]
-		[TestCase("lightBuffer", 4, 3)]
+		[TestCase("lightBuffer", 7, 3)]
 		public void Preview_CountsEveryPassWithItsOwnGroups(string schemaId, long variants, long oneValueEach)
 		{
 			var schema = schemaId == "spotLight" ? FulumaShaderKeywords.SpotLight : FulumaShaderKeywords.LightBuffer;
@@ -95,6 +96,10 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 
 				var lightBuffer = FulumaShaderKeywords.LightBuffer;
 				Assert.AreEqual(0b10UL, lightBuffer.GetValues(FulumaShaderStrippingSource.LightBufferPattern(feature), 0), "Depth aware.");
+				var lightBufferDepth = lightBuffer.IndexOf(FulumaShaderKeywords.LightBufferDepth);
+				Assert.AreEqual(FulumaSpotLightRenderPass.CompatibilityModeActive ? 0b11UL : 0b01UL,
+					lightBuffer.GetValues(FulumaShaderStrippingSource.LightBufferPattern(feature), lightBufferDepth),
+					"URP's depth texture only on the Compatibility path.");
 
 				feature.UseSceneDepth = false;
 				feature.UseClipBoxes = false;
@@ -110,6 +115,8 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 				Assert.AreEqual(0b10UL, schema.GetValues(pattern, schema.IndexOf(FulumaShaderKeywords.LampGlare)));
 				Assert.AreEqual(0b01UL, lightBuffer.GetValues(FulumaShaderStrippingSource.LightBufferPattern(feature), 0),
 					"Without scene depth the buffer composites bilinearly.");
+				Assert.AreEqual(0b01UL, lightBuffer.GetValues(FulumaShaderStrippingSource.LightBufferPattern(feature), lightBufferDepth),
+					"Without scene depth nothing reads URP's depth texture.");
 			}
 			finally
 			{

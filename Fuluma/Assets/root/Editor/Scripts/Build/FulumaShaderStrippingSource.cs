@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Saesentsessis.Fuluma.Editor.Core;
 using Saesentsessis.Fuluma.Rendering.URP;
 using Saesentsessis.Shaders.Stripping;
 using UnityEditor;
@@ -55,7 +56,14 @@ namespace Saesentsessis.Fuluma.Editor.Build
 		{
 			var schema = FulumaShaderKeywords.LightBuffer;
 			var depthAware = feature.UseSceneDepth && feature.LightBufferUpsample == LightBufferUpsample.DepthAware;
-			return schema.WithValue(schema.AllValues, FulumaShaderKeywords.Upsample, depthAware ? 1 : 0);
+			var pattern = schema.WithValue(schema.AllValues, FulumaShaderKeywords.Upsample, depthAware ? 1 : 0);
+
+			// Only the Compatibility path samples URP's depth texture (with MSAA, or without an intermediate depth), and
+			// only with scene depth. Whether it runs is the project's Compatibility Mode setting when the build starts.
+			if (feature.UseSceneDepth == false || FulumaSpotLightRenderPass.CompatibilityModeActive == false)
+				pattern = schema.WithValue(pattern, FulumaShaderKeywords.LightBufferDepth, 0);
+
+			return pattern;
 		}
 
 		/// <summary>
@@ -95,7 +103,7 @@ namespace Saesentsessis.Fuluma.Editor.Build
 				if (asset is not UniversalRenderPipelineAsset universal)
 					continue;
 
-				foreach (var renderer in universal.rendererDataList)
+				foreach (var renderer in UrpRendererDataList.Of(universal))
 				{
 					if (renderer == null)
 						continue;

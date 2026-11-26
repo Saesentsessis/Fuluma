@@ -71,6 +71,7 @@ are on the [roadmap](#upcoming-changes).
   - Analytical in-scattering: inverse-square falloff with a smooth range cut-off and an inner/outer cone penumbra,
     integrated along each view ray up to the scene depth. No raymarching, no noise, no temporal passes.
   - Correct with the camera inside a cone; a near-plane fade hides the edge the near plane cuts through it.
+  - Works with URP's RenderGraph and Compatibility Mode, from Unity 2022.3.
   - Scattering options: Henyey-Greenstein forward scattering (beams faint from the side, bright toward their lamp),
     Unity's own light falloff (intensity means what a Unity Light's does) and point-lamp glare, each its own shader
     variant.
@@ -416,26 +417,49 @@ How it works under the hood is explained in
 
 ## Platform Support
 
-| Platform / feature                         | Status                  |
-|--------------------------------------------|-------------------------|
-| URP Forward, Forward+, Deferred, Deferred+ | Verified                |
-| Perspective and orthographic cameras       | Verified                |
-| MSAA                                       | Verified                |
-| Windows, Direct3D 12 (Editor and player)   | Verified                |
-| Android, Vulkan (Mali-G52, Mali-G77)       | Verified                |
-| Windows, Direct3D 11 (Editor)              | Verified                |
-| Android, OpenGL ES 3.x                     | Not supported (planned) |
-| XR single-pass instanced                   | Untested                |
-| iOS and macOS, Metal                       | Untested                |
-| WebGPU                                     | Untested                |
-| Consoles                                   | Untested                |
+**Verified**: run in the test suite or on a device. **Expected**: not run, but on the same code path as the verified
+versions around it. **Untested**: no evidence either way. **Not supported**: known not to work. **Not available**:
+that Unity version's URP doesn't offer the render path to renderer features.
 
-**Verified**: run in the test suite or on a device. **Untested**: no evidence either way. **Not supported**: known
-not to work.
+### Features
+
+| Feature                                    | Status   |
+|--------------------------------------------|----------|
+| URP Forward, Forward+, Deferred, Deferred+ | Verified |
+| Perspective and orthographic cameras       | Verified |
+| MSAA                                       | Verified |
+| XR single-pass instanced                   | Untested |
+
+### Platforms
+
+| Platform                                      | Status                  |
+|-----------------------------------------------|-------------------------|
+| Windows, Direct3D 12 (Editor and player)      | Verified                |
+| Windows, Direct3D 11 (Editor)                 | Verified                |
+| Android, Vulkan (Mali-G52, Mali-G77)          | Verified                |
+| Web, WebGPU (Chrome on Windows, Unity 6000.0) | Verified                |
+| Android, OpenGL ES 3.x                        | Not supported (planned) |
+| iOS and macOS, Metal                          | Untested                |
+| Consoles                                      | Untested                |
 
 Some OpenGL ES 3.x drivers, Mali's among them, give vertex shaders no structured buffers, which Fuluma needs (see
 [Hardware Requirements](#hardware-requirements)); there the render feature logs an error and draws nothing. A path
 through constant buffers is planned.
+
+### Unity Versions
+
+| Unity                     | URP        | RenderGraph   | Compatibility Mode                  |
+|---------------------------|------------|---------------|-------------------------------------|
+| 2022.3 (from 2022.3.20f1) | 14         | Not available | Verified (2022.3.62f3)              |
+| 2023.1, 2023.2            | 15, 16     | Not available | Expected                            |
+| 6000.0                    | 17.0       | Verified      | Verified (6000.0.85f2)              |
+| 6000.1, 6000.2            | 17.1, 17.2 | Expected      | Expected                            |
+| 6000.3                    | 17.3       | Verified      | Expected (`URP_COMPATIBILITY_MODE`) |
+| 6000.4, 6000.5            | 17.4, 17.5 | Expected      | Not available                       |
+| 6000.6                    | 17.6       | Verified      | Not available                       |
+| 6000.7 (beta)             | 17.7       | Verified      | Not available                       |
+
+How the two render paths differ: [Render paths](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/FulumaRenderFeature.md#render-paths).
 
 ## Hardware Requirements
 
@@ -448,8 +472,9 @@ As a practical floor, Fuluma is profiled on a budget phone with a Mali-G51 GPU (
 
 ## Requirements
 
-- Unity **6000.3** or newer
-- [`com.unity.render-pipelines.universal`](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@latest) **17.3.0** or newer, with RenderGraph (Compatibility Mode is not supported)
+- Unity **2022.3.20f1** or newer (tested: 2022.3.62f3, 6000.0.85f2, 6000.3, 6000.6, 6000.7; 2023.1 and 2023.2 expected
+  to work, untested)
+- [`com.unity.render-pipelines.universal`](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@latest) **14.0.10** or newer, RenderGraph or Compatibility Mode (see [Render paths](https://github.com/Saesentsessis/Fuluma/blob/main/Fuluma/Assets/root/Documentation~/FulumaRenderFeature.md#render-paths))
 - [`com.unity.burst`](https://docs.unity3d.com/Packages/com.unity.burst@latest) **1.8.25** or newer
 - [`com.unity.collections`](https://docs.unity3d.com/Packages/com.unity.collections@latest) **2.6.2** or newer
 - [`com.unity.mathematics`](https://docs.unity3d.com/Packages/com.unity.mathematics@latest) **1.3.3** or newer
@@ -472,7 +497,7 @@ Or manually add the scoped registry to your `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.saesentsessis.fuluma": "0.1.0"
+    "com.saesentsessis.fuluma": "0.2.0"
   },
   "scopedRegistries": [
     {
@@ -492,7 +517,7 @@ Unity MeshGen and ShaderWorks).
 ### Method 2: Unity package installer
 
 1. Download the latest `.unitypackage` from [GitHub Releases page](https://github.com/Saesentsessis/Fuluma/releases).
-   - _Direct Link:_ [Fuluma-Installer.unitypackage](https://github.com/Saesentsessis/Fuluma/releases/download/0.1.0/Fuluma-Installer.unitypackage)
+   - _Direct Link:_ [Fuluma-Installer.unitypackage](https://github.com/Saesentsessis/Fuluma/releases/download/0.2.0/Fuluma-Installer.unitypackage)
 2. Import the downloaded package into your Unity project.
 3. The installer will automatically configure OpenUPM in your `manifest.json` file and install the package dependencies.
 
@@ -508,7 +533,7 @@ Unity MeshGen and ShaderWorks).
 You can specify exact release version of this package like this:
 
 ```
-https://github.com/Saesentsessis/Fuluma.git?path=Fuluma/Assets/root#0.1.0
+https://github.com/Saesentsessis/Fuluma.git?path=Fuluma/Assets/root#0.2.0
 ```
 
 Git dependencies of a git package are not resolved by Unity, so add the three dependency repositories first, the same
@@ -540,7 +565,6 @@ Rough sketches, not commitments — anything here may change shape or not ship a
   cone.
 - [ ] **Batched clipbox/light adds/removes/sets** from native arrays.
 - [ ] **More performance-related work** so the overhead on your project from this repository stays minimal.
-- [ ] **URP Compatibility Mode support** (RenderGraph only for now).
 
 ## Contributing
 

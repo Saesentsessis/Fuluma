@@ -11,6 +11,9 @@
 //                                   similarity to the camera pixel (joint bilateral upsampling), nearest depth if none fits
 // Gathers (2x2 texels per fetch) keep both depth passes cheap on mobile GPUs, where the per-texel loads dominated
 // (measured on a Mali-G52, see docs/dev/PixelShaderIdeas.md); they need shader model 4.5, like the light shader.
+// _FULUMA_CAMERA_DEPTH_TEXTURE (passes 0 and 2): the scene depth is URP's _CameraDepthTexture instead of the texture
+// the pass is given. The Compatibility path uses it where the camera's depth attachment can't be sampled (MSAA, or no
+// intermediate depth), since C# there can't bind URP's depth texture.
 Shader "Hidden/Fuluma/LightBuffer"
 {
     HLSLINCLUDE
@@ -51,10 +54,18 @@ Shader "Hidden/Fuluma/LightBuffer"
             #pragma vertex Vert
             #pragma fragment DownsampleDepthFragment
             #pragma multi_compile_local _ _FULUMA_CHECKERBOARD
+            #pragma multi_compile_local _ _FULUMA_CAMERA_DEPTH_TEXTURE
 
             // The source is a depth texture: keep full precision.
             #define USE_FULL_PRECISION_BLIT_TEXTURE
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+
+        #if defined(_FULUMA_CAMERA_DEPTH_TEXTURE)
+            TEXTURE2D_X_FLOAT(_CameraDepthTexture);
+            #define FULUMA_SOURCE_DEPTH _CameraDepthTexture
+        #else
+            #define FULUMA_SOURCE_DEPTH _BlitTexture
+        #endif
 
             // xy: source (full-resolution) size in pixels, zw: target (low-resolution) size in pixels.
             float4 _FulumaDownsampleSizes;
@@ -110,7 +121,7 @@ Shader "Hidden/Fuluma/LightBuffer"
                             int x = FulumaPairStart(i, pairs.x, first.x, last.x);
 
                             // The corner shared by texels (x, y) and (x + 1, y + 1).
-                            float4 rawDepths = GATHER_RED_TEXTURE2D_X(_BlitTexture, sampler_PointClamp, (float2(x, y) + 1.0) * texelSize);
+                            float4 rawDepths = GATHER_RED_TEXTURE2D_X(FULUMA_SOURCE_DEPTH, sampler_PointClamp, (float2(x, y) + 1.0) * texelSize);
                             nearMin = min(nearMin, min(min(rawDepths.x, rawDepths.y), min(rawDepths.z, rawDepths.w)));
                             nearMax = max(nearMax, max(max(rawDepths.x, rawDepths.y), max(rawDepths.z, rawDepths.w)));
                         }
@@ -125,7 +136,7 @@ Shader "Hidden/Fuluma/LightBuffer"
                         UNITY_LOOP
                         for (int x = first.x; x <= last.x; x++)
                         {
-                            float rawDepth = LOAD_TEXTURE2D_X(_BlitTexture, int2(x, y)).r;
+                            float rawDepth = LOAD_TEXTURE2D_X(FULUMA_SOURCE_DEPTH, int2(x, y)).r;
                             nearMin = min(nearMin, rawDepth);
                             nearMax = max(nearMax, rawDepth);
                         }
@@ -192,12 +203,21 @@ Shader "Hidden/Fuluma/LightBuffer"
             #pragma target 4.5
             #pragma vertex Vert
             #pragma fragment DepthAwareCompositeFragment
+            #pragma multi_compile_local _ _FULUMA_CAMERA_DEPTH_TEXTURE
 
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
             // Linear eye depth per low-resolution texel (written by the downsample).
             TEXTURE2D_X_FLOAT(_FulumaLowResDepth);
+
+            // The full-resolution depth the downsample read.
+        #if defined(_FULUMA_CAMERA_DEPTH_TEXTURE)
+            TEXTURE2D_X_FLOAT(_CameraDepthTexture);
+            #define FULUMA_SCENE_DEPTH _CameraDepthTexture
+        #else
             TEXTURE2D_X_FLOAT(_FulumaCameraDepth);
+            #define FULUMA_SCENE_DEPTH _FulumaCameraDepth
+        #endif
 
             // xy: low-resolution size in pixels, zw: unused.
             float4 _FulumaLowResSize;
@@ -217,7 +237,7 @@ Shader "Hidden/Fuluma/LightBuffer"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                float depth = FulumaEyeDepth(LOAD_TEXTURE2D_X(_FulumaCameraDepth, uint2(input.positionCS.xy)).r);
+                float depth = FulumaEyeDepth(LOAD_TEXTURE2D_X(FULUMA_SCENE_DEPTH, uint2(input.positionCS.xy)).r);
 
                 // The 2x2 low-resolution texels around this pixel, and their bilinear weights.
                 float2 texel = input.texcoord * _FulumaLowResSize.xy - 0.5;

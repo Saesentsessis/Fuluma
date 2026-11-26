@@ -169,7 +169,12 @@ namespace Saesentsessis.Fuluma.Tests.Editor.Utils
 		/// Whether the project's URP renderer uses a deferred path (Deferred or Deferred+).
 		/// </summary>
 		public bool RendersDeferred => _rendererData != null
+#if UNITY_6000_1_OR_NEWER
 		                               && _rendererData.renderingMode is RenderingMode.Deferred or RenderingMode.DeferredPlus;
+#else
+		                               // Deferred+ exists from Unity 6.1.
+		                               && _rendererData.renderingMode == RenderingMode.Deferred;
+#endif
 
 		/// <summary>
 		/// Whether the lights read the scene's depth, until <see cref="Dispose"/> (recreates the feature's pass).

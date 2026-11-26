@@ -71,7 +71,7 @@ public static class FulumaProfilingBuild
 		}
 
 		var changed = false;
-		foreach (var stressTest in UnityEngine.Object.FindObjectsByType<SpotLightStressTest>(FindObjectsInactive.Include))
+		foreach (var stressTest in FindAll<SpotLightStressTest>())
 		{
 			var serialized = new SerializedObject(stressTest);
 			var property = serialized.FindProperty("occluderMaterial");
@@ -215,9 +215,20 @@ public static class FulumaProfilingBuild
 		return (ShaderStrippingSettings)stripping;
 	}
 
+	/// <summary>
+	/// Every loaded <typeparamref name="T"/>, inactive ones included (the overload without a sort mode exists from Unity
+	/// 6000.7; the 2022.3 and 6000.0 profiling projects use this script too).
+	/// </summary>
+	private static T[] FindAll<T>() where T : UnityEngine.Object
+#if UNITY_6000_7_OR_NEWER
+		=> UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include);
+#else
+		=> UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+#endif
+
 	private static Camera FindMainCamera()
 	{
-		var cameras = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include);
+		var cameras = FindAll<Camera>();
 		foreach (var camera in cameras)
 			if (camera.CompareTag("MainCamera"))
 				return camera;

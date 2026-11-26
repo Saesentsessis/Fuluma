@@ -19,6 +19,10 @@
 #define FULUMA_CLIP_BOX_SUBTRACT 0x8000u
 #define FULUMA_CLIP_BOX_INDEX_MASK 0x7FFFu
 
+// Smallest box-space direction component the orthographic view ray gets (FulumaClipBoxVaryings): its slab distances
+// stay finite (at most ~2e20), where an exact zero would divide by zero.
+#define FULUMA_CLIP_MIN_DIRECTION 1e-20
+
 struct FulumaPackedClipBox
 {
     float4 row0;
@@ -42,8 +46,9 @@ uint FulumaClipBoxReference(uint2 references, uint slot)
 }
 
 // [enter, exit] of the ray o + t * d inside the box [-1, 1]^3, with o and d already in box space (enter >= exit: the ray
-// misses it). A zero component of d gives +-inf: the slab is either everything or nothing along the ray, as it should;
-// d = 0 entirely (no box) gives (-inf, +inf).
+// misses it). A zero component of d divides by zero, which only Direct3D defines (+-inf: the slab is everything or
+// nothing along the ray); the orthographic ray, constant per light and exactly axis-aligned in common views, is kept
+// off zero (FULUMA_CLIP_MIN_DIRECTION). d = 0 entirely (no box) only occurs for unused slots, whose result is ignored.
 float2 FulumaClipBoxSlab(float3 o, float3 d)
 {
     float3 inverse = rcp(d);
