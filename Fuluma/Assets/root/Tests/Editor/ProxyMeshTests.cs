@@ -14,6 +14,15 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 	/// </summary>
 	public class ProxyMeshTests
 	{
+		/// <summary>
+		/// Relative tolerance between two fits of the same LOD: MeshGen generates the vertices with Burst, and the Editor
+		/// runs a call as Mono code until Burst has compiled it, so two builds can differ by a rounding step.
+		/// </summary>
+		private const float FitTolerance = 1e-5f;
+
+		private static void AssertSameFit(float expected, float actual, string message)
+			=> Assert.AreEqual(expected, actual, expected * FitTolerance, message);
+
 		// ---------- Helpers ----------
 
 		/// <summary>
@@ -119,7 +128,7 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 					Assert.AreEqual(single.vertexCount, submesh.vertexCount, $"LOD{lod} vertices");
 					Assert.AreEqual(single.GetIndexCount(0), (uint)submesh.indexCount, $"LOD{lod} indices");
 					Assert.AreEqual(shape.CosSegment, lods.Shapes[lod].CosSegment);
-					Assert.AreEqual(shape.CapAnglePerWidened, lods.Shapes[lod].CapAnglePerWidened);
+					AssertSameFit(shape.CapAnglePerWidened, lods.Shapes[lod].CapAnglePerWidened, $"LOD{lod} cap angle");
 					Assert.AreEqual(descriptor.Lods[lod].ScreenSize, lods.ScreenSizes[lod]);
 					if (lod > 0)
 						Assert.LessOrEqual(lods.ScreenSizes[lod], lods.ScreenSizes[lod - 1]);
@@ -132,7 +141,7 @@ namespace Saesentsessis.Fuluma.Tests.Editor
 
 				// The class defaults and the built-in set share LOD0.
 				Assert.AreEqual(builtIn.Mesh.GetSubMesh(0).vertexCount, lods.Mesh.GetSubMesh(0).vertexCount);
-				Assert.AreEqual(builtIn.Shapes[0].CapAnglePerWidened, lods.Shapes[0].CapAnglePerWidened);
+				AssertSameFit(builtIn.Shapes[0].CapAnglePerWidened, lods.Shapes[0].CapAnglePerWidened, "LOD0 cap angle");
 			}
 			finally
 			{
